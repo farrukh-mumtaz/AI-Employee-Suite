@@ -1,20 +1,3 @@
-Here are two types of descriptions you need for your GitHub repository.
-
-### 1. The Short Description (For the "About" box)
-
-When you first create the repository, GitHub gives you a small text box labeled "Description." You can copy and paste this single sentence:
-
-> **SMJ AI Employee Suite (MVP v1.0): An AI-powered platform automating HR, Sales, Marketing, and Customer Support through intelligent agents, featuring a centralized CEO Dashboard.**
-> 
-
----
-
-### 2. The README.md Description (For the main page)
-
-Every good GitHub repository has a `README.md` file. This is the main document that greets anyone who looks at the code. You can copy and paste the text below directly into your README file to clearly explain the project and enforce your rules.
-
----
-
 # AI Employee Suite - MVP v1.0
 
 ## Project Vision
