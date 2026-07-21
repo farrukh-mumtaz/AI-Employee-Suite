@@ -11,7 +11,7 @@ def on_startup():
 
 @app.get("/")
 def read_root():
-    return {"message": "AI Employee Suite backend is running"}
+    return {"message": "AI Employee Suite backend is up and running"}
 
 @app.get("/health")
 def health_check():
