@@ -1,6 +1,6 @@
 ﻿from fastapi import FastAPI
 from sqlalchemy import text
-from database import engine
+from backend.app.db.database import engine
 
 app = FastAPI(title="AI Employee Suite Backend")
 
