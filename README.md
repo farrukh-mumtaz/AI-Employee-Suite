@@ -52,3 +52,13 @@ A task is only considered complete and ready to merge when:
 
 
 * A demo has been completed.
+
+## Testing
+
+This scaffold has been tested end-to-end across three scenarios:
+
+1. **Standard use case** — HR agent responding to a policy question, using a custom `system_prompt`. Confirmed the response matched the given role.
+2. **Reusability across agents** — Same scaffold, different `system_prompt` (Sales agent). Confirmed the same code produces a completely different tone and behavior just by changing the prompt, proving the scaffold works generically across agent types.
+3. **Missing system_prompt (edge case)** — Called the graph without providing a `system_prompt`. Confirmed it falls back gracefully to a default assistant behavior instead of crashing.
+
+All three tests passed. Test files (`test_agent.py`, `test_sales.py`, `test_error.py`) are in the project root and can be run directly with `python <filename>.py` for reference.
