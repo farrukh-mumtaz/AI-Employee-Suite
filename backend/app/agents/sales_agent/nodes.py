@@ -34,3 +34,17 @@ if __name__ == "__main__":
 
     result = lead_qualification_node(test_state)
     print("Result:", result)
+    
+def notify_sales_node(state: SalesLeadState) -> SalesLeadState:
+    """Qualified branch: hot lead - flag for the sales team."""
+    state["notified"] = True
+    state["agent_response"] = (
+        f"[HOT LEAD - sales team notified] {state.get('agent_response', '')}"
+    )
+    return state
+
+
+def skip_notify_node(state: SalesLeadState) -> SalesLeadState:
+    """Unqualified branch: warm/cold lead - no urgent alert needed."""
+    state["notified"] = False
+    return state
