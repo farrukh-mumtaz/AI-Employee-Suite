@@ -4,6 +4,11 @@
 # backend/app/core/graph.py, but defines its own graph shape instead of
 # calling build_base_graph() directly, since the HR agent needs conditional
 # routing between two workflows rather than the single linear call_llm node.
+#
+# Every node in nodes.py returns a partial state update (only the keys it
+# changes) rather than the full state dict; StateGraph merges each node's
+# return value into the running state using the default last-value-wins
+# channel behavior, since HRAgentState declares no custom reducers.
 from langgraph.graph import END, StateGraph
 
 from backend.app.agents.hr_agent.nodes import (

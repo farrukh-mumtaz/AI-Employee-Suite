@@ -7,16 +7,22 @@ from backend.app.core.state import AgentState
 HRWorkflow = Literal["onboarding", "leave_request", "unknown"]
 
 
-class HRAgentState(AgentState):
+class HRAgentState(AgentState, total=False):
     """HR Agent state.
 
     Extends the shared core `AgentState` (messages, user_input, agent_response,
     agent_name) with the extra fields the HR workflows need. Keeping these
     fields on a subclass -- instead of editing the shared `AgentState` -- means
     other agents built on the shared scaffold are unaffected by HR-specific data.
+
+    `total=False` marks every field declared on *this* subclass as optional
+    (per PEP 589, this does not affect the inherited `AgentState` fields,
+    which remain required). That matches reality: callers construct the
+    initial state with only the base `AgentState` fields, and each field
+    below is filled in by a later node as the graph runs.
     """
 
-    # Set by the classifier node in nodes.py and used by graph.py to decide
+    # Set by classify_intent_node in nodes.py and used by graph.py to decide
     # which workflow branch (onboarding vs. leave request) to run.
     workflow: HRWorkflow
 
