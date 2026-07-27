@@ -3,9 +3,14 @@ from backend.app.core.state import AgentState
 from backend.app.core.llm_client import get_llm
 
 def call_llm_node(state: AgentState) -> AgentState:
-    llm = get_llm()
-    response = llm.invoke(state["user_input"])
-    state["agent_response"] = response.content
+    try:
+        llm = get_llm()
+        system_prompt = state.get("system_prompt") or "You are a helpful AI assistant."
+        full_prompt = f"{system_prompt}\n\nUser: {state['user_input']}"
+        response = llm.invoke(full_prompt)
+        state["agent_response"] = response.content
+    except Exception as e:
+        state["agent_response"] = f"Sorry, something went wrong: {str(e)}"
     return state
 
 def build_base_graph():
