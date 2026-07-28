@@ -5,6 +5,7 @@ from backend.app.models.user import User
 from backend.app.core.security import hash_password, verify_password
 from backend.app.core.jwt_handler import create_access_token, create_refresh_token, decode_token
 from pydantic import BaseModel
+from backend.app.core.dependencies import require_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -62,3 +63,11 @@ def refresh(data: RefreshRequest):
 
     new_access_token = create_access_token({"sub": payload["sub"]})
     return {"access_token": new_access_token, "token_type": "bearer"}
+
+
+
+# This is a protected endpoint - only users with role="admin" can access it.
+# Anyone else (or anyone without a valid token) gets a 401/403 error.
+@router.get("/admin-only")
+def admin_only_route(current_user: User = Depends(require_role(["admin"]))):
+    return {"message": f"Welcome, admin {current_user.name}!"}
