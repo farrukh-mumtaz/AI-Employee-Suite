@@ -178,34 +178,65 @@ def retrieve_leave_policy_node(state: HRAgentState) -> Dict[str, Any]:
 
 
 def evaluate_leave_request_node(state: HRAgentState) -> Dict[str, Any]:
-    """Draft a response acknowledging the leave request.
+    """Decide whether the leave request can be auto-approved.
 
-    Placeholder implementation: the agent never auto-approves/denies leave --
-    it always routes to manual HR review. Future integration point: connect
-    to a real leave-balance/approval system to make (or assist a manager in
-    making) the actual decision.
+    Deterministic, rule-based placeholder: a request auto-approves only when
+    the earlier extraction step was able to identify the leave type and both
+    dates. Anything left "Unspecified" can't be responsibly evaluated, so it
+    is routed to manual HR review instead ("rejected" here is a routing
+    label, not a denial -- see reject_leave_node). Future integration point:
+    replace with a real approval engine (leave balances, manager sign-off,
+    the actual policy store) once one exists; graph.py routes on whatever
+    this returns without caring how the decision was made.
     """
     leave_type = state.get("leave_type", "Unspecified")
     leave_start_date = state.get("leave_start_date", "Unspecified")
     leave_end_date = state.get("leave_end_date", "Unspecified")
 
-    prompt = prompts.LEAVE_REQUEST_EVALUATION_PROMPT.format(
-        leave_type=leave_type,
-        leave_start_date=leave_start_date,
-        leave_end_date=leave_end_date,
+    is_fully_specified = "Unspecified" not in (leave_type, leave_start_date, leave_end_date)
+    decision = "approved" if is_fully_specified else "rejected"
+
+    return {"leave_decision": decision}
+
+
+def approve_leave_node(state: HRAgentState) -> Dict[str, Any]:
+    """Terminal node for the leave workflow's "approved" branch: draft a
+    confirmation message for the employee."""
+    prompt = prompts.LEAVE_REQUEST_APPROVED_PROMPT.format(
+        leave_type=state.get("leave_type", "Unspecified"),
+        leave_start_date=state.get("leave_start_date", "Unspecified"),
+        leave_end_date=state.get("leave_end_date", "Unspecified"),
         policy_context="\n".join(state.get("leave_policy_context") or []),
         user_input=state.get("user_input", ""),
     )
     fallback = (
-        "Thanks for submitting your leave request. It has been recorded and "
-        "is pending manual review by HR."
+        f"Good news -- your {state.get('leave_type', 'leave')} request "
+        f"from {state.get('leave_start_date', 'Unspecified')} to "
+        f"{state.get('leave_end_date', 'Unspecified')} has been approved."
     )
     content = _invoke_llm(prompt, fallback=fallback)
+    return {"agent_response": content}
 
-    return {
-        "leave_decision": "pending_manual_review",
-        "agent_response": content,
-    }
+
+def reject_leave_node(state: HRAgentState) -> Dict[str, Any]:
+    """Terminal node for the leave workflow's "rejected" branch: let the
+    employee know the request needs manual HR review. This is reached when
+    the request couldn't be fully understood, not when HR has actually
+    declined it -- the message must not read as a denial."""
+    prompt = prompts.LEAVE_REQUEST_REJECTED_PROMPT.format(
+        leave_type=state.get("leave_type", "Unspecified"),
+        leave_start_date=state.get("leave_start_date", "Unspecified"),
+        leave_end_date=state.get("leave_end_date", "Unspecified"),
+        policy_context="\n".join(state.get("leave_policy_context") or []),
+        user_input=state.get("user_input", ""),
+    )
+    fallback = (
+        "We weren't able to automatically process your leave request because "
+        "some details were missing or unclear. It has been forwarded to HR "
+        "for manual review."
+    )
+    content = _invoke_llm(prompt, fallback=fallback)
+    return {"agent_response": content}
 
 
 # --- Fallback ---

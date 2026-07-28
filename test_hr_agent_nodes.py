@@ -120,14 +120,83 @@ class GenerateOnboardingChecklistNodeTests(unittest.TestCase):
 
 
 class EvaluateLeaveRequestNodeTests(unittest.TestCase):
-    @patch.object(nodes, "get_llm")
-    def test_always_pending_review_even_when_llm_fails(self, mock_get_llm):
-        mock_get_llm.return_value = RaisingLLM()
-        state = {"user_input": "Requesting leave.", "leave_policy_context": []}
+    def test_approves_when_type_and_both_dates_are_known(self):
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+        }
         result = nodes.evaluate_leave_request_node(state)
-        self.assertEqual(result["leave_decision"], "pending_manual_review")
-        self.assertIsInstance(result["agent_response"], str)
-        self.assertTrue(result["agent_response"])
+        self.assertEqual(result, {"leave_decision": "approved"})
+
+    def test_rejects_when_leave_type_unspecified(self):
+        state = {
+            "leave_type": "Unspecified",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+        }
+        result = nodes.evaluate_leave_request_node(state)
+        self.assertEqual(result, {"leave_decision": "rejected"})
+
+    def test_rejects_when_dates_unspecified(self):
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Unspecified",
+            "leave_end_date": "Unspecified",
+        }
+        result = nodes.evaluate_leave_request_node(state)
+        self.assertEqual(result, {"leave_decision": "rejected"})
+
+    def test_rejects_when_fields_missing_entirely(self):
+        result = nodes.evaluate_leave_request_node({})
+        self.assertEqual(result, {"leave_decision": "rejected"})
+
+    def test_does_not_call_llm(self):
+        with patch.object(nodes, "get_llm") as mock_get_llm:
+            nodes.evaluate_leave_request_node({"leave_type": "sick leave"})
+            mock_get_llm.assert_not_called()
+
+
+class ApproveLeaveNodeTests(unittest.TestCase):
+    @patch.object(nodes, "get_llm")
+    def test_returns_only_agent_response_key(self, mock_get_llm):
+        mock_get_llm.return_value.invoke.return_value = FakeResponse("Approved!")
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+        }
+        result = nodes.approve_leave_node(state)
+        self.assertEqual(result, {"agent_response": "Approved!"})
+
+    @patch.object(nodes, "get_llm")
+    def test_llm_failure_uses_readable_fallback(self, mock_get_llm):
+        mock_get_llm.return_value = RaisingLLM()
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+        }
+        result = nodes.approve_leave_node(state)
+        self.assertIn("approved", result["agent_response"].lower())
+        self.assertIn("sick leave", result["agent_response"])
+
+
+class RejectLeaveNodeTests(unittest.TestCase):
+    @patch.object(nodes, "get_llm")
+    def test_returns_only_agent_response_key(self, mock_get_llm):
+        mock_get_llm.return_value.invoke.return_value = FakeResponse("Needs manual review.")
+        result = nodes.reject_leave_node({"user_input": "I need some time off."})
+        self.assertEqual(result, {"agent_response": "Needs manual review."})
+
+    @patch.object(nodes, "get_llm")
+    def test_llm_failure_uses_readable_fallback_that_does_not_read_as_a_denial(self, mock_get_llm):
+        mock_get_llm.return_value = RaisingLLM()
+        result = nodes.reject_leave_node({"user_input": "I need some time off."})
+        fallback = result["agent_response"].lower()
+        self.assertIn("manual review", fallback)
+        self.assertNotIn("denied", fallback)
+        self.assertNotIn("rejected", fallback)
 
 
 class UnknownIntentNodeTests(unittest.TestCase):

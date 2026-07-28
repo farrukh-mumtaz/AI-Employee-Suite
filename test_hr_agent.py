@@ -46,9 +46,13 @@ class FakeLLM:
         if "welcoming a new employee" in lowered:
             return FakeResponse("Welcome aboard! We're excited to have you join us.")
 
-        if "processing a leave request" in lowered:
+        if "confirming an approved leave request" in lowered:
+            return FakeResponse("Your leave request has been approved. Enjoy your time off!")
+
+        if "responding to a leave request that could not be" in lowered:
             return FakeResponse(
-                "Your leave request has been submitted and is pending manual review."
+                "We couldn't automatically process your leave request; it has "
+                "been forwarded to HR for manual review."
             )
 
         raise AssertionError(f"FakeLLM received an unexpected prompt: {prompt!r}")
@@ -72,7 +76,7 @@ class HRAgentGraphTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.graph = build_hr_graph()
 
-    def test_leave_request_flow_routes_and_updates_state(self):
+    def test_leave_request_with_full_details_is_approved(self):
         result = self.graph.invoke(
             _initial_state(
                 "I need to request sick leave from Aug 1 to Aug 3, I'm unwell."
@@ -80,10 +84,34 @@ class HRAgentGraphTests(unittest.TestCase):
         )
 
         self.assertEqual(result["workflow"], "leave_request")
-        self.assertEqual(result["leave_decision"], "pending_manual_review")
+        self.assertEqual(result["leave_type"], "sick leave")
+        self.assertEqual(result["leave_start_date"], "Aug 1")
+        self.assertEqual(result["leave_end_date"], "Aug 3")
+        self.assertEqual(result["leave_decision"], "approved")
         self.assertIsInstance(result["leave_policy_context"], list)
         self.assertGreater(len(result["leave_policy_context"]), 0)
-        self.assertIsNotNone(result["agent_response"])
+        self.assertEqual(
+            result["agent_response"],
+            "Your leave request has been approved. Enjoy your time off!",
+        )
+
+        # Onboarding-only fields must never be touched by this branch.
+        self.assertIsNone(result.get("employee_name"))
+        self.assertIsNone(result.get("onboarding_checklist"))
+
+    def test_leave_request_with_missing_details_is_rejected_for_manual_review(self):
+        result = self.graph.invoke(
+            _initial_state("I'd like to request leave but haven't decided on dates yet.")
+        )
+
+        self.assertEqual(result["workflow"], "leave_request")
+        self.assertEqual(result["leave_type"], "Unspecified")
+        self.assertEqual(result["leave_decision"], "rejected")
+        self.assertEqual(
+            result["agent_response"],
+            "We couldn't automatically process your leave request; it has "
+            "been forwarded to HR for manual review.",
+        )
 
         # Onboarding-only fields must never be touched by this branch.
         self.assertIsNone(result.get("employee_name"))

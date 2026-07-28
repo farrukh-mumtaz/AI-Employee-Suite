@@ -12,12 +12,14 @@
 from langgraph.graph import END, StateGraph
 
 from backend.app.agents.hr_agent.nodes import (
+    approve_leave_node,
     classify_intent_node,
     evaluate_leave_request_node,
     extract_employee_details_node,
     extract_leave_details_node,
     generate_onboarding_checklist_node,
     generate_welcome_message_node,
+    reject_leave_node,
     retrieve_leave_policy_node,
     unknown_intent_node,
 )
@@ -30,6 +32,15 @@ def _route_by_workflow(state: HRAgentState) -> str:
     return state.get("workflow", "unknown")
 
 
+def _route_by_leave_decision(state: HRAgentState) -> str:
+    """Conditional-edge selector: reads the decision made by
+    evaluate_leave_request_node and picks the approve or reject branch.
+    Defaults to "rejected" (manual review) for any unrecognized value so a
+    future change to the decision logic can't dead-end the graph."""
+    decision = state.get("leave_decision")
+    return decision if decision in ("approved", "rejected") else "rejected"
+
+
 def build_hr_graph():
     """Build and compile the HR Agent graph.
 
@@ -38,7 +49,9 @@ def build_hr_graph():
             -> onboarding branch: extract_employee_details -> generate_welcome_message
                -> generate_onboarding_checklist -> END
             -> leave_request branch: extract_leave_details -> retrieve_leave_policy
-               -> evaluate_leave_request -> END
+               -> evaluate_leave_request
+                   -> approved -> approve_leave -> END
+                   -> rejected -> reject_leave -> END
             -> unknown branch: unknown_intent -> END
     """
     graph = StateGraph(HRAgentState)
@@ -54,6 +67,8 @@ def build_hr_graph():
     graph.add_node("extract_leave_details", extract_leave_details_node)
     graph.add_node("retrieve_leave_policy", retrieve_leave_policy_node)
     graph.add_node("evaluate_leave_request", evaluate_leave_request_node)
+    graph.add_node("approve_leave", approve_leave_node)
+    graph.add_node("reject_leave", reject_leave_node)
 
     # Fallback branch
     graph.add_node("unknown_intent", unknown_intent_node)
@@ -78,7 +93,16 @@ def build_hr_graph():
     # Leave request branch wiring
     graph.add_edge("extract_leave_details", "retrieve_leave_policy")
     graph.add_edge("retrieve_leave_policy", "evaluate_leave_request")
-    graph.add_edge("evaluate_leave_request", END)
+    graph.add_conditional_edges(
+        "evaluate_leave_request",
+        _route_by_leave_decision,
+        {
+            "approved": "approve_leave",
+            "rejected": "reject_leave",
+        },
+    )
+    graph.add_edge("approve_leave", END)
+    graph.add_edge("reject_leave", END)
 
     # Fallback branch wiring
     graph.add_edge("unknown_intent", END)
