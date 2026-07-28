@@ -1,1 +1,1 @@
-﻿# Package for models
+﻿from backend.app.models.user import User
