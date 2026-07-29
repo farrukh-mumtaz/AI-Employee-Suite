@@ -5,10 +5,74 @@
 # reads/writes fields on it, and returns it. The LLM is always obtained via
 # the shared `get_llm()` factory so model/provider swaps happen in one place.
 # Mirrors the structure of hr_agent/nodes.py.
+import uuid
+from typing import Any, Dict
+
 from backend.app.agents.support_agent import prompts
 from backend.app.agents.support_agent.rag import lookup_order_status, retrieve_refund_policy
 from backend.app.agents.support_agent.state import SupportAgentState
 from backend.app.core.llm_client import get_llm
+
+# --- Ticket intake helpers ---
+#
+# Simple, deterministic keyword heuristic -- no LLM call -- so every
+# incoming message gets a ticket immediately, before the (LLM-based, and
+# therefore slower/fallible) classify_intent_node runs. Future integration
+# point: replace with a real ticketing system's intake rules, or an ML
+# priority model, once one exists.
+_HIGH_PRIORITY_KEYWORDS = (
+    "urgent", "asap", "immediately", "emergency", "critical",
+    "fraud", "unauthorized", "locked out", "can't access", "cannot access",
+)
+_LOW_PRIORITY_KEYWORDS = (
+    "just wondering", "no rush", "whenever", "just curious", "question about",
+)
+
+# Placeholder category: ticket_intake_node runs before classify_intent, so
+# there's no real intent signal yet. Future integration point: refine this
+# once a triage model or a real ticketing system's category rules exist --
+# classify_intent_node's later, LLM-based `workflow` classification is the
+# actual routing signal in the meantime.
+_DEFAULT_ISSUE_CATEGORY = "General Support"
+
+
+def _determine_ticket_priority(user_input: str) -> str:
+    """Placeholder priority heuristic: keyword match against a small set of
+    urgency signals, defaulting to "Medium" when nothing matches."""
+    lowered = user_input.lower()
+    if any(keyword in lowered for keyword in _HIGH_PRIORITY_KEYWORDS):
+        return "High"
+    if any(keyword in lowered for keyword in _LOW_PRIORITY_KEYWORDS):
+        return "Low"
+    return "Medium"
+
+
+def ticket_intake_node(state: SupportAgentState) -> Dict[str, Any]:
+    """Entry node: open a support ticket before intent classification runs.
+
+    Every incoming request gets a ticket -- regardless of what it turns out
+    to be about -- with a unique ID, "Open" status, and a placeholder
+    priority/category so there's always something to track and triage even
+    if classification later resolves to "unknown".
+
+    Only fills in fields that aren't already set, and never touches any
+    other key (including `user_input`) -- so all existing state is
+    preserved, and re-running intake on a request that already has a ticket
+    (e.g. a resumed conversation) won't mint a second ticket ID for it.
+    """
+    user_input = state.get("user_input") or ""
+    updates: Dict[str, Any] = {}
+
+    if not state.get("ticket_id"):
+        updates["ticket_id"] = f"TCK-{uuid.uuid4().hex[:8].upper()}"
+    if not state.get("ticket_status"):
+        updates["ticket_status"] = "Open"
+    if not state.get("ticket_priority"):
+        updates["ticket_priority"] = _determine_ticket_priority(user_input)
+    if not state.get("issue_category"):
+        updates["issue_category"] = _DEFAULT_ISSUE_CATEGORY
+
+    return updates
 
 
 def classify_intent_node(state: SupportAgentState) -> SupportAgentState:

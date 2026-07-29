@@ -8,6 +8,9 @@ SupportWorkflow = Literal[
     "password_reset", "order_status", "refund_request", "unknown"
 ]
 
+# Priority assigned by ticket_intake_node's placeholder heuristic.
+TicketPriority = Literal["Low", "Medium", "High"]
+
 
 class SupportAgentState(AgentState):
     """Support Agent state.
@@ -18,6 +21,13 @@ class SupportAgentState(AgentState):
     other agents built on the shared scaffold are unaffected by support-specific
     data. Mirrors the pattern used by `backend/app/agents/hr_agent/state.py`.
     """
+
+    # --- Ticket intake fields (set by ticket_intake_node, which runs before
+    # classify_intent as the graph's entry point) ---
+    ticket_id: Optional[str]
+    ticket_status: Optional[str]
+    ticket_priority: Optional[TicketPriority]
+    issue_category: Optional[str]
 
     # Set by the classifier node in nodes.py and used by graph.py to decide
     # which workflow branch (password reset / order status / refund) to run.
