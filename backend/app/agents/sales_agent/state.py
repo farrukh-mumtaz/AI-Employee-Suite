@@ -7,3 +7,5 @@ class SalesLeadState(AgentState):
     intent: Optional[str]       # "hot" / "warm" / "cold"
     lead_name: Optional[str]
     notified: Optional[bool]
+    followup_email_subject: Optional[str]
+    followup_email_body: Optional[str]
