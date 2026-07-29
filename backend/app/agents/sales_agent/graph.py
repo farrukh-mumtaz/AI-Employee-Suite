@@ -10,6 +10,7 @@ from backend.app.agents.sales_agent.nodes import (
     lead_qualification_node,
     notify_sales_node,
     skip_notify_node,
+    draft_followup_email_node,
 )
 from backend.app.agents.sales_agent.state import SalesLeadState
 
@@ -25,13 +26,14 @@ def build_sales_graph():
 
     Flow:
         lead_qualification
-            -> qualified branch (hot lead): notify_sales -> END
+            -> qualified branch (hot lead): notify_sales -> draft_followup_email -> END
             -> unqualified branch (warm/cold lead): skip_notify -> END
     """
     graph = StateGraph(SalesLeadState)
 
     graph.add_node("lead_qualification", lead_qualification_node)
     graph.add_node("notify_sales", notify_sales_node)
+    graph.add_node("draft_followup_email", draft_followup_email_node)
     graph.add_node("skip_notify", skip_notify_node)
 
     graph.set_entry_point("lead_qualification")
@@ -45,7 +47,8 @@ def build_sales_graph():
         },
     )
 
-    graph.add_edge("notify_sales", END)
+    graph.add_edge("notify_sales", "draft_followup_email")
+    graph.add_edge("draft_followup_email", END)
     graph.add_edge("skip_notify", END)
 
     return graph.compile()
