@@ -51,6 +51,21 @@ def get_employee(employee_id: int, session: Session = Depends(get_session), curr
         raise HTTPException(status_code=404, detail="Employee not found")
     return employee
 
+# Updates an existing employee's details (name, department, position).
+@router.patch("/employees/{employee_id}")
+def update_employee(employee_id: int, data: EmployeeCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    employee = session.get(Employee, employee_id)
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    employee.name = data.name
+    employee.department = data.department
+    employee.position = data.position
+    session.add(employee)
+    session.commit()
+    session.refresh(employee)
+    return employee
+
 # --- Leave request endpoints ---
 
 # Submits a new leave request for an employee. Starts as "pending".
