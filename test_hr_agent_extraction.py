@@ -85,5 +85,55 @@ class ExtractLeaveTypeTests(unittest.TestCase):
         self.assertIsNone(extraction.extract_leave_type("I need some time off."))
 
 
+class ExtractLeaveReasonTests(unittest.TestCase):
+    """Covers extraction.extract_leave_reason, added to support the leave
+    workflow's reason field (backend/app/agents/hr_agent/state.py
+    leave_reason). No prior test file covered this function."""
+
+    def test_because_of_pattern(self):
+        self.assertEqual(
+            extraction.extract_leave_reason(
+                "Requesting sick leave from Aug 1 to Aug 3 because of a medical procedure."
+            ),
+            "a medical procedure",
+        )
+
+    def test_because_pattern_stops_before_temporal_clause(self):
+        self.assertEqual(
+            extraction.extract_leave_reason(
+                "I need leave because I have a family emergency starting Monday."
+            ),
+            "I have a family emergency",
+        )
+
+    def test_due_to_pattern(self):
+        self.assertEqual(
+            extraction.extract_leave_reason("Requesting personal leave due to a family emergency."),
+            "a family emergency",
+        )
+
+    def test_reason_colon_pattern(self):
+        self.assertEqual(
+            extraction.extract_leave_reason(
+                "Requesting unpaid leave, reason: relocating to a new apartment."
+            ),
+            "relocating to a new apartment",
+        )
+
+    def test_no_match_returns_none(self):
+        self.assertIsNone(extraction.extract_leave_reason("I need some time off."))
+
+    def test_bare_for_clause_is_not_treated_as_a_reason(self):
+        # Deliberate design choice: a bare "for ..." marker is not matched
+        # (unlike "because of"/"due to"/"reason:") since it collides with
+        # duration phrasing like "leave for 3 days" -- see extraction.py's
+        # _LEAVE_REASON_PATTERNS comment.
+        self.assertIsNone(
+            extraction.extract_leave_reason(
+                "I need to take vacation from 2026-09-01 to 2026-09-05 for my sister's wedding."
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,11 @@
 ﻿from fastapi import FastAPI
 from sqlalchemy import text
+from backend.app.api.hr import router as hr_router
 from backend.app.db.database import engine
 
 app = FastAPI(title="AI Employee Suite Backend")
+
+app.include_router(hr_router)
 
 @app.on_event("startup")
 def on_startup():
