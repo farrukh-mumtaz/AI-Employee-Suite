@@ -5,3 +5,4 @@ class AgentState(TypedDict):
     user_input: str
     agent_response: Optional[str]
     agent_name: str
+    system_prompt: Optional[str]
