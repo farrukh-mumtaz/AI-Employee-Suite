@@ -9,3 +9,5 @@ class SalesLeadState(AgentState):
     notified: Optional[bool]
     followup_email_subject: Optional[str]
     followup_email_body: Optional[str]
+    has_objection: Optional[bool]
+    objection_response: Optional[str]

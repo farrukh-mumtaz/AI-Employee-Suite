@@ -22,6 +22,8 @@ def run_test(label, name, message):
     print("Agent reply:", result.get("agent_response"))
     print("Follow-up subject:", result.get("followup_email_subject"))
     print("Follow-up body:", result.get("followup_email_body"))
+    print("Has objection:", result.get("has_objection"))
+    print("Objection response:", result.get("objection_response"))
     print()
     return result
 

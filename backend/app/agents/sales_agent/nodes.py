@@ -2,6 +2,12 @@ import json
 from backend.app.agents.sales_agent.prompts import (
     LEAD_QUALIFICATION_PROMPT,
     FOLLOWUP_EMAIL_PROMPT,
+    OBJECTION_HANDLING_PROMPT,
+)
+
+from backend.app.agents.sales_agent.prompts import (
+    LEAD_QUALIFICATION_PROMPT,
+    FOLLOWUP_EMAIL_PROMPT,
 )
 from backend.app.core.llm_client import get_llm
 from backend.app.agents.sales_agent.state import SalesLeadState
@@ -68,4 +74,19 @@ def draft_followup_email_node(state: SalesLeadState) -> SalesLeadState:
 
     state["followup_email_subject"] = result["subject"]
     state["followup_email_body"] = result["body"]
+    return state
+def handle_objection_node(state: SalesLeadState) -> SalesLeadState:
+    """Detects and responds to a sales objection in the lead's message."""
+    llm = get_llm()
+
+    prompt = OBJECTION_HANDLING_PROMPT.format(
+        lead_name=state.get("lead_name", "there"),
+        user_message=state["user_input"],
+    )
+
+    response = llm.invoke(prompt)
+    result = json.loads(response.content)
+
+    state["has_objection"] = result["has_objection"]
+    state["objection_response"] = result["response"]
     return state

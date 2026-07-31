@@ -14,6 +14,7 @@ Do the following:
 Respond ONLY in this JSON format, nothing else:
 {{"intent": "hot/warm/cold", "reply": "your reply here"}}"""
 
+
 FOLLOWUP_EMAIL_PROMPT = """You are a sales assistant writing a follow-up email to a hot lead.
 
 Customer name: {lead_name}
@@ -27,3 +28,22 @@ Write a short, professional follow-up email that:
 
 Respond ONLY in this JSON format, nothing else:
 {{"subject": "email subject line", "body": "email body text"}}"""
+
+
+OBJECTION_HANDLING_PROMPT = """You are a sales assistant handling a potential objection from a lead.
+
+Customer name: {lead_name}
+Customer's message: {user_message}
+
+First, determine if this message contains a sales objection (e.g. price concerns,
+"not the right time," already using a competitor, doubts about value, etc.)
+versus a normal question or neutral statement.
+
+If it IS an objection, write a short, respectful response that acknowledges their
+concern genuinely (don't dismiss it) and offers one honest, non-pushy point that
+might help - without being salesy or pressuring them.
+
+If it is NOT an objection, say so plainly.
+
+Respond ONLY in this JSON format, nothing else:
+{{"has_objection": true/false, "response": "your response here, or empty string if no objection"}}"""
