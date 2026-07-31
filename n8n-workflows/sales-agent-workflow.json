@@ -138,7 +138,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        928,
+        1136,
         -32
       ],
       "id": "04ff763c-2aa1-4d88-be18-3155baf68092",
@@ -153,11 +153,230 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        944,
+        1152,
         112
       ],
       "id": "b65db749-413a-45eb-957c-b18d4cb47dbd",
       "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs",
+          "mode": "list",
+          "cachedResultName": "Sales Agent Leads - Test",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Webhook').item.json.body.name }}",
+            "Message": "={{ $('Webhook').item.json.body.message }}",
+            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
+            "Notified": "={{ $json.notification }}",
+            "Timestamp": "={{ $now }}",
+            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "AI reply",
+              "displayName": "AI reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notified",
+              "displayName": "Notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        -32
+      ],
+      "id": "ba987be6-a490-4a66-86aa-bf5b243e3fb5",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "brP3DccqoEYiSF3M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs",
+          "mode": "list",
+          "cachedResultName": "Sales Agent Leads - Test",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Webhook').item.json.body.name }}",
+            "Message": "={{ $('Webhook').item.json.body.message }}",
+            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
+            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}",
+            "Notified": "={{ $json.notification }}",
+            "Timestamp": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI reply",
+              "displayName": "AI reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notified",
+              "displayName": "Notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        944,
+        112
+      ],
+      "id": "fd19138c-ceae-445f-afd5-e19b19844473",
+      "name": "Append or update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "brP3DccqoEYiSF3M",
+          "name": "Google Sheets account"
+        }
+      }
     }
   ],
   "pinData": {
@@ -165,8 +384,8 @@
       {
         "json": {
           "body": {
-            "name": "Zain",
-            "message": "hey"
+            "name": "TestSync",
+            "message": "Actually, never mind, not interested anymore"
           }
         }
       }
@@ -217,7 +436,7 @@
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Append or update row in sheet",
             "type": "main",
             "index": 0
           }
@@ -225,6 +444,28 @@
       ]
     },
     "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet1": {
       "main": [
         [
           {
@@ -242,7 +483,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "c308ea1e-d2ff-4cc7-9e09-3f75033b2c27",
+  "versionId": "58e2867e-9488-42ed-8cbe-09ea7ceaa961",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "3df69b723821ca35cf14f4e68bb37b1b463ef4d8628f9cb0e0b3960c48af8950"
