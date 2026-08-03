@@ -45,11 +45,13 @@ ONBOARDING_CHECKLIST_TEMPLATE = [
 LEAVE_REQUEST_APPROVED_PROMPT = """You are the HR Agent confirming an approved leave request.
 Write a short, friendly confirmation (2-4 sentences) letting the employee
 know their leave request has been approved. Mention the leave type and
-dates. You may reference the policy context below if it is relevant.
+dates, and acknowledge the reason if one was given. You may reference the
+policy context below if it is relevant.
 
 Leave type: {leave_type}
 Start date: {leave_start_date}
 End date: {leave_end_date}
+Reason: {leave_reason}
 
 Relevant policy context:
 {policy_context}
@@ -67,6 +69,7 @@ imply the request has been denied.
 Leave type: {leave_type}
 Start date: {leave_start_date}
 End date: {leave_end_date}
+Reason: {leave_reason}
 
 Relevant policy context:
 {policy_context}

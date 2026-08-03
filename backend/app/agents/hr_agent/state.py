@@ -43,6 +43,11 @@ class HRAgentState(AgentState, total=False):
     leave_type: Optional[str]
     leave_start_date: Optional[str]
     leave_end_date: Optional[str]
+    # Populated by extraction.py's extract_leave_reason heuristic in
+    # extract_leave_details_node. Purely informational context surfaced in
+    # the approve/reject response messages -- not a gating input to
+    # evaluate_leave_request_node's auto-approval check.
+    leave_reason: Optional[str]
     # Populated by rag.py's placeholder retrieval step. Future integration
     # point for a real leave-policy knowledge base / vector store.
     leave_policy_context: Optional[List[str]]

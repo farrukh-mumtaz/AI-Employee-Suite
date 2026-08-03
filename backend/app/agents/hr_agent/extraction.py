@@ -24,12 +24,25 @@ _NAME_PATTERNS = [
     re.compile(
         r"(?i:for)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2}),?\s+(?i:who|starting|joining)"
     ),
+    # Fallback: "onboard(ing) <Name>" -- e.g. "Please onboard John Doe as a
+    # Backend Engineer". Appended last (lowest priority) since it's the most
+    # generic marker and the other, more specific patterns above should win
+    # when they match.
+    re.compile(r"(?i:onboard(?:ing)?)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"),
 ]
 
 _ROLE_PATTERNS = [
     re.compile(r"\bas an? ([A-Za-z][A-Za-z\s/-]{1,40}?)" + _TRAILING_STOP, re.IGNORECASE),
     re.compile(r"\brole(?: of)?[:\s]+([A-Za-z][A-Za-z\s/-]{1,40}?)" + _TRAILING_STOP, re.IGNORECASE),
     re.compile(r"\bposition[:\s]+([A-Za-z][A-Za-z\s/-]{1,40}?)" + _TRAILING_STOP, re.IGNORECASE),
+    # Fallback: "as (our/the) (new) <Role>" without the "a/an" article --
+    # e.g. "joining as Software Engineer", "as our new Sales Director". The
+    # captured role itself stays capitalized-only (unlike the patterns
+    # above) so this broader, article-less match doesn't swallow ordinary
+    # phrases like "as of next week".
+    re.compile(
+        r"(?i:as)\s+(?:(?i:our|the)\s+)?(?:(?i:new)\s+)?([A-Z][A-Za-z\s/-]{1,40}?)" + _TRAILING_STOP
+    ),
 ]
 
 _MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
@@ -47,6 +60,20 @@ _RELATIVE_DATE_PATTERN = re.compile(
     r"next (?:mon|tues?|wednes|thurs?|fri|satur|sun)day)\b",
     re.IGNORECASE,
 )
+
+# Fallback markers for a free-text leave reason -- e.g. "because I have a
+# family emergency", "due to a medical procedure". Reuses `_TRAILING_STOP`
+# (rather than a second stop pattern) so the reason capture stops at the
+# same connector words/punctuation as the name/role patterns above (e.g.
+# before a trailing "on 2026-08-01" or "starting Monday").
+# More specific phrases ("because of") are listed before their substrings
+# ("because") so the more precise match wins.
+_LEAVE_REASON_PATTERNS = [
+    re.compile(r"(?i:because of)\s+(.+?)" + _TRAILING_STOP),
+    re.compile(r"(?i:because)\s+(.+?)" + _TRAILING_STOP),
+    re.compile(r"(?i:due to)\s+(.+?)" + _TRAILING_STOP),
+    re.compile(r"(?i:reason(?: is)?:?)\s+(.+?)" + _TRAILING_STOP),
+]
 
 # keyword -> canonical label. Checked in order, first match wins.
 _LEAVE_TYPE_KEYWORDS = [
@@ -99,6 +126,20 @@ def extract_dates(text: str, max_dates: int = 2) -> List[str]:
     if not matches:
         matches = [m.group(0) for m in _RELATIVE_DATE_PATTERN.finditer(text)]
     return matches[:max_dates]
+
+
+def extract_leave_reason(text: str) -> Optional[str]:
+    """Best-effort extraction of the free-text reason behind a leave request
+    (e.g. "because I have a family emergency", "due to a medical
+    procedure"). Returns None if no marker phrase matches -- callers should
+    fall back to a placeholder."""
+    for pattern in _LEAVE_REASON_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            reason = match.group(1).strip().rstrip(".,;")
+            if reason:
+                return reason
+    return None
 
 
 def extract_leave_type(text: str) -> Optional[str]:

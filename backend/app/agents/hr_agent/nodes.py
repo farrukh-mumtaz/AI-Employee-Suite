@@ -131,7 +131,7 @@ def generate_onboarding_checklist_node(state: HRAgentState) -> Dict[str, Any]:
 
 
 def extract_leave_details_node(state: HRAgentState) -> Dict[str, Any]:
-    """Pull leave type / start / end dates out of the request.
+    """Pull leave type / start / end dates / reason out of the request.
 
     Uses simple regex/keyword heuristics (see extraction.py), same caveat as
     `extract_employee_details_node`: replace with structured extraction or
@@ -142,6 +142,9 @@ def extract_leave_details_node(state: HRAgentState) -> Dict[str, Any]:
 
     if not state.get("leave_type"):
         updates["leave_type"] = extraction.extract_leave_type(user_input) or "Unspecified"
+
+    if not state.get("leave_reason"):
+        updates["leave_reason"] = extraction.extract_leave_reason(user_input) or "Not specified"
 
     need_start = not state.get("leave_start_date")
     need_end = not state.get("leave_end_date")
@@ -206,6 +209,7 @@ def approve_leave_node(state: HRAgentState) -> Dict[str, Any]:
         leave_type=state.get("leave_type", "Unspecified"),
         leave_start_date=state.get("leave_start_date", "Unspecified"),
         leave_end_date=state.get("leave_end_date", "Unspecified"),
+        leave_reason=state.get("leave_reason", "Not specified"),
         policy_context="\n".join(state.get("leave_policy_context") or []),
         user_input=state.get("user_input", ""),
     )
@@ -227,6 +231,7 @@ def reject_leave_node(state: HRAgentState) -> Dict[str, Any]:
         leave_type=state.get("leave_type", "Unspecified"),
         leave_start_date=state.get("leave_start_date", "Unspecified"),
         leave_end_date=state.get("leave_end_date", "Unspecified"),
+        leave_reason=state.get("leave_reason", "Not specified"),
         policy_context="\n".join(state.get("leave_policy_context") or []),
         user_input=state.get("user_input", ""),
     )

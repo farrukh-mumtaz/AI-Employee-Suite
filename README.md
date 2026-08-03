@@ -8,7 +8,7 @@ The objective of this project is to design and develop the MVP of the SMJ AI Emp
 
 By the end of the 8-week development cycle, this repository will contain:
 
-* **AI HR Agent**
+* **AI HR Agent** — see [HR_AGENT.md](HR_AGENT.md) for full documentation (architecture, workflows, API, testing).
 
 * **AI Sales Agent**
 

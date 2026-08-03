@@ -99,6 +99,26 @@ class ExtractLeaveDetailsNodeTests(unittest.TestCase):
         self.assertEqual(result["leave_start_date"], "Unspecified")
         self.assertEqual(result["leave_end_date"], "Unspecified")
 
+    def test_extracts_leave_reason_when_present(self):
+        state = {
+            "user_input": "Requesting sick leave from Aug 1 to Aug 3 because of a medical procedure."
+        }
+        result = nodes.extract_leave_details_node(state)
+        self.assertEqual(result["leave_reason"], "a medical procedure")
+
+    def test_leave_reason_falls_back_to_not_specified(self):
+        state = {"user_input": "I need some time off."}
+        result = nodes.extract_leave_details_node(state)
+        self.assertEqual(result["leave_reason"], "Not specified")
+
+    def test_does_not_overwrite_preexisting_leave_reason(self):
+        state = {
+            "user_input": "Requesting sick leave because of a medical procedure.",
+            "leave_reason": "Provided Reason",
+        }
+        result = nodes.extract_leave_details_node(state)
+        self.assertNotIn("leave_reason", result)
+
 
 class GenerateWelcomeMessageNodeTests(unittest.TestCase):
     @patch.object(nodes, "get_llm")
@@ -181,6 +201,31 @@ class ApproveLeaveNodeTests(unittest.TestCase):
         self.assertIn("approved", result["agent_response"].lower())
         self.assertIn("sick leave", result["agent_response"])
 
+    @patch.object(nodes, "get_llm")
+    def test_leave_reason_is_passed_into_the_prompt(self, mock_get_llm):
+        mock_get_llm.return_value.invoke.return_value = FakeResponse("Approved!")
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+            "leave_reason": "a medical procedure",
+        }
+        nodes.approve_leave_node(state)
+        prompt_sent = mock_get_llm.return_value.invoke.call_args[0][0]
+        self.assertIn("a medical procedure", prompt_sent)
+
+    @patch.object(nodes, "get_llm")
+    def test_missing_leave_reason_defaults_to_not_specified_in_prompt(self, mock_get_llm):
+        mock_get_llm.return_value.invoke.return_value = FakeResponse("Approved!")
+        state = {
+            "leave_type": "sick leave",
+            "leave_start_date": "Aug 1",
+            "leave_end_date": "Aug 3",
+        }
+        nodes.approve_leave_node(state)
+        prompt_sent = mock_get_llm.return_value.invoke.call_args[0][0]
+        self.assertIn("Reason: Not specified", prompt_sent)
+
 
 class RejectLeaveNodeTests(unittest.TestCase):
     @patch.object(nodes, "get_llm")
@@ -197,6 +242,17 @@ class RejectLeaveNodeTests(unittest.TestCase):
         self.assertIn("manual review", fallback)
         self.assertNotIn("denied", fallback)
         self.assertNotIn("rejected", fallback)
+
+    @patch.object(nodes, "get_llm")
+    def test_leave_reason_is_passed_into_the_prompt(self, mock_get_llm):
+        mock_get_llm.return_value.invoke.return_value = FakeResponse("Needs manual review.")
+        state = {
+            "user_input": "I need leave, not sure of the dates.",
+            "leave_reason": "a family emergency",
+        }
+        nodes.reject_leave_node(state)
+        prompt_sent = mock_get_llm.return_value.invoke.call_args[0][0]
+        self.assertIn("a family emergency", prompt_sent)
 
 
 class UnknownIntentNodeTests(unittest.TestCase):
