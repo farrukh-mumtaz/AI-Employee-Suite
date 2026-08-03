@@ -11,3 +11,18 @@ Keep it concise and natural - avoid sounding like generic marketing copy.
 
 Respond ONLY in this JSON format, nothing else:
 {{"content": "your generated content here"}}"""
+
+CAMPAIGN_IDEA_PROMPT = """{system_prompt}
+
+You are brainstorming marketing campaign ideas for the following goal:
+
+Goal: {campaign_goal}
+Topic/product: {content_topic}
+
+Generate 3 distinct campaign concepts. Each should have a different angle
+(e.g. one could focus on urgency, another on social proof, another on
+storytelling) so they're genuinely different from each other, not just
+reworded versions of the same idea.
+
+Respond ONLY in this JSON format, nothing else:
+{{"ideas": ["idea 1 here", "idea 2 here", "idea 3 here"]}}"""
