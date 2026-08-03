@@ -51,3 +51,15 @@ run_test(
     "for enterprise tier, want to sign this week if the numbers work, please "
     "call me ASAP at your earliest convenience.",
 )
+# Test 7: Hot lead WITH an objection - email should reference it
+run_test(
+    "Test 7: Hot lead with objection",
+    "Noor",
+    "I'm interested in your enterprise plan, but honestly it seems quite expensive compared to what competitors charge",
+)
+# Test 8: Unambiguously hot lead who also raises an objection
+run_test(
+    "Test 8: Hot lead with objection (stronger intent)",
+    "Noor",
+    "We want to move forward with your enterprise plan and sign this week, though I'll be honest, the price is higher than what competitors quoted us",
+)

@@ -60,13 +60,23 @@ def skip_notify_node(state: SalesLeadState) -> SalesLeadState:
     return state
 
 def draft_followup_email_node(state: SalesLeadState) -> SalesLeadState:
-    """Runs after a hot lead is notified - drafts a personalized follow-up email."""
+    """Runs after a hot lead is notified - drafts a personalized follow-up email.
+    If an objection was detected earlier, the email addresses it directly."""
     llm = get_llm()
+
+    if state.get("has_objection"):
+        objection_context = f"Objection they raised: {state.get('objection_response', '')}"
+        objection_instruction = "4. Gently address the objection mentioned above, building on the earlier response to it"
+    else:
+        objection_context = ""
+        objection_instruction = ""
 
     prompt = FOLLOWUP_EMAIL_PROMPT.format(
         lead_name=state.get("lead_name", "there"),
         user_message=state["user_input"],
         ai_reply=state.get("agent_response", ""),
+        objection_context=objection_context,
+        objection_instruction=objection_instruction,
     )
 
     response = llm.invoke(prompt)
