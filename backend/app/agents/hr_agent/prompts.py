@@ -10,9 +10,14 @@ Read the user's message and decide which HR workflow it belongs to.
 Respond with exactly one word, lowercase, no punctuation:
 - "onboarding" if the message is about onboarding a new employee, setting up
   a new hire, first-day preparation, etc.
-- "leave_request" if the message is about requesting time off, sick leave,
-  vacation, parental leave, or checking leave status.
-- "unknown" if it does not clearly match either workflow.
+- "leave_request" ONLY if the employee is actively submitting a NEW request
+  for time off (sick leave, vacation, parental leave, etc.) -- for example,
+  giving or asking to give specific dates/leave type for an absence.
+- "unknown" for everything else, INCLUDING general questions about leave
+  policy (e.g. "what's the parental leave policy?"), questions about
+  remaining leave balance, or checking the status of an already-submitted
+  request. There is no dedicated workflow for those yet, so they must not be
+  classified as "leave_request" even though they mention leave.
 
 User message:
 {user_input}
@@ -46,7 +51,9 @@ LEAVE_REQUEST_APPROVED_PROMPT = """You are the HR Agent confirming an approved l
 Write a short, friendly confirmation (2-4 sentences) letting the employee
 know their leave request has been approved. Mention the leave type and
 dates, and acknowledge the reason if one was given. You may reference the
-policy context below if it is relevant.
+policy context below if it is relevant. No employee name is provided --
+greet them generically (e.g. "Hi there") rather than inventing a
+placeholder like "[Employee]" or "[Name]".
 
 Leave type: {leave_type}
 Start date: {leave_start_date}
@@ -64,7 +71,9 @@ LEAVE_REQUEST_REJECTED_PROMPT = """You are the HR Agent responding to a leave re
 automatically approved. Write a short, courteous message (2-4 sentences)
 explaining that the request needs manual HR review -- for example because
 some details were missing or unclear -- and that HR will follow up. Do NOT
-imply the request has been denied.
+imply the request has been denied. No employee name is provided -- greet
+them generically (e.g. "Hi there") rather than inventing a placeholder like
+"[Employee]" or "[Name]".
 
 Leave type: {leave_type}
 Start date: {leave_start_date}

@@ -1,10 +1,13 @@
 # Node implementations for the Support Agent graph.
 #
 # Every node follows the shared scaffold's convention (see
-# backend/app/core/graph.py): a plain function that takes the state dict,
-# reads/writes fields on it, and returns it. The LLM is always obtained via
-# the shared `get_llm()` factory so model/provider swaps happen in one place.
-# Mirrors the structure of hr_agent/nodes.py.
+# backend/app/core/graph.py): a plain function that takes the state dict and
+# returns updates to it. The LLM is always obtained via the shared
+# `get_llm()` factory so model/provider swaps happen in one place.
+#
+# Nodes return a *partial* update dict (only the keys they change) rather
+# than mutating the input `state` and returning it whole -- the
+# LangGraph-recommended pattern, mirroring hr_agent/nodes.py.
 import json
 import logging
 import uuid
@@ -17,6 +20,28 @@ from backend.app.core.llm_client import get_llm
 from backend.app.core.rag_node import rag_retrieval_node
 
 logger = logging.getLogger(__name__)
+
+
+def _invoke_llm(prompt: str, *, fallback: str) -> str:
+    """Call the LLM and return its text content, or `fallback` if the call
+    fails or returns something unusable.
+
+    Mirrors hr_agent.nodes._invoke_llm: centralizes LLM error handling so
+    every node degrades gracefully (network errors, missing/invalid API key,
+    provider outage, rate limiting, an unexpectedly empty response) instead
+    of letting the whole graph invocation crash on a transient failure.
+    """
+    try:
+        llm = get_llm()
+        response = llm.invoke(prompt)
+        content = getattr(response, "content", None)
+        if not content or not str(content).strip():
+            raise ValueError("LLM returned an empty response")
+        return str(content)
+    except Exception:
+        logger.exception("Support agent LLM call failed; using fallback response")
+        return fallback
+
 
 # --- Ticket intake helpers ---
 #
@@ -133,7 +158,7 @@ def ticket_classification_node(state: SupportAgentState) -> Dict[str, Any]:
     return {"ticket_category": category, "ticket_category_confidence": confidence}
 
 
-def classify_intent_node(state: SupportAgentState) -> SupportAgentState:
+def classify_intent_node(state: SupportAgentState) -> Dict[str, Any]:
     """Entry node: decide whether this request is a password reset, order
     status check, refund request, or unknown, and store the result on
     `state["workflow"]` so graph.py's conditional edge can route to the
@@ -143,21 +168,25 @@ def classify_intent_node(state: SupportAgentState) -> SupportAgentState:
     with a more robust intent-routing model, or with explicit workflow
     selection from the frontend (e.g. the user clicked "Request a refund").
     """
-    llm = get_llm()
-    prompt = prompts.CLASSIFY_INTENT_PROMPT.format(user_input=state.get("user_input") or "")
-    response = llm.invoke(prompt)
-    intent = response.content.strip().lower()
+    user_input = (state.get("user_input") or "").strip()
+    if not user_input:
+        # Nothing to classify -- avoid a wasted LLM call and let the
+        # fallback branch ask the user to clarify.
+        return {"workflow": "unknown"}
+
+    prompt = prompts.CLASSIFY_INTENT_PROMPT.format(user_input=user_input)
+    raw_intent = _invoke_llm(prompt, fallback="unknown")
+    intent = raw_intent.strip().lower()
 
     if intent not in ("password_reset", "order_status", "refund_request"):
         intent = "unknown"
 
-    state["workflow"] = intent
-    return state
+    return {"workflow": intent}
 
 
 # --- Password Reset workflow nodes ---
 
-def extract_account_details_node(state: SupportAgentState) -> SupportAgentState:
+def extract_account_details_node(state: SupportAgentState) -> Dict[str, Any]:
     """Pull the account email out of the request.
 
     Placeholder implementation: real extraction (structured output / an
@@ -166,11 +195,12 @@ def extract_account_details_node(state: SupportAgentState) -> SupportAgentState:
     Future integration point: replace with structured extraction or pull the
     email from the authenticated user's session instead of parsing free text.
     """
-    state.setdefault("account_email", "Unknown")
-    return state
+    if state.get("account_email"):
+        return {}
+    return {"account_email": "Unknown"}
 
 
-def send_password_reset_node(state: SupportAgentState) -> SupportAgentState:
+def send_password_reset_node(state: SupportAgentState) -> Dict[str, Any]:
     """Simulate sending a password reset link and draft a response.
 
     Placeholder implementation: no auth system is wired up yet, so this only
@@ -178,66 +208,70 @@ def send_password_reset_node(state: SupportAgentState) -> SupportAgentState:
     Future integration point: call the real auth/identity service to
     generate and email a reset link.
     """
-    state["reset_link_sent"] = True
-
-    llm = get_llm()
-    prompt = prompts.PASSWORD_RESET_PROMPT.format(
-        account_email=state.get("account_email", "Unknown"),
+    account_email = state.get("account_email", "Unknown")
+    prompt = prompts.PASSWORD_RESET_PROMPT.format(account_email=account_email)
+    fallback = (
+        f"A password reset link has been sent to {account_email}. "
+        "Please check your inbox (and spam folder) shortly."
     )
-    response = llm.invoke(prompt)
-    state["agent_response"] = response.content
-    return state
+    content = _invoke_llm(prompt, fallback=fallback)
+    return {"reset_link_sent": True, "agent_response": content}
 
 
 # --- Order Status workflow nodes ---
 
-def extract_order_details_node(state: SupportAgentState) -> SupportAgentState:
+def extract_order_details_node(state: SupportAgentState) -> Dict[str, Any]:
     """Pull the order ID out of the request.
 
     Placeholder implementation, same caveat as `extract_account_details_node`:
     replace with structured extraction or an explicit order-lookup form once
     available.
     """
-    state.setdefault("order_id", "Unspecified")
-    return state
+    if state.get("order_id"):
+        return {}
+    return {"order_id": "Unspecified"}
 
 
-def retrieve_order_status_node(state: SupportAgentState) -> SupportAgentState:
+def retrieve_order_status_node(state: SupportAgentState) -> Dict[str, Any]:
     """Fetch the current order status via rag.py's placeholder lookup.
 
     Future integration point: `lookup_order_status` currently returns a
     fixed placeholder string; swap in a real order-management/shipping
     system call once one exists.
     """
-    state["order_status"] = lookup_order_status(state.get("order_id"))
-    return state
+    return {"order_status": lookup_order_status(state.get("order_id"))}
 
 
-def generate_order_status_response_node(state: SupportAgentState) -> SupportAgentState:
+def generate_order_status_response_node(state: SupportAgentState) -> Dict[str, Any]:
     """Draft a response summarizing the order status for the customer."""
-    llm = get_llm()
     prompt = prompts.ORDER_STATUS_PROMPT.format(
         order_id=state.get("order_id", "Unspecified"),
         order_status=state.get("order_status", "Unknown"),
-        user_input=state["user_input"],
+        user_input=state.get("user_input", ""),
     )
-    response = llm.invoke(prompt)
-    state["agent_response"] = response.content
-    return state
+    fallback = (
+        f"Here's the latest on order {state.get('order_id', 'Unspecified')}: "
+        f"{state.get('order_status', 'Unknown')}."
+    )
+    content = _invoke_llm(prompt, fallback=fallback)
+    return {"agent_response": content}
 
 
 # --- Refund Request workflow nodes ---
 
-def extract_refund_details_node(state: SupportAgentState) -> SupportAgentState:
+def extract_refund_details_node(state: SupportAgentState) -> Dict[str, Any]:
     """Pull the order ID and refund reason out of the request.
 
     Placeholder implementation, same caveat as the other extraction nodes:
     replace with structured extraction or an explicit refund-request form
     once available.
     """
-    state.setdefault("order_id", "Unspecified")
-    state.setdefault("refund_reason", "Unspecified")
-    return state
+    updates: Dict[str, Any] = {}
+    if not state.get("order_id"):
+        updates["order_id"] = "Unspecified"
+    if not state.get("refund_reason"):
+        updates["refund_reason"] = "Unspecified"
+    return updates
 
 
 def retrieve_refund_policy_node(state: SupportAgentState) -> Dict[str, Any]:
@@ -257,7 +291,7 @@ def retrieve_refund_policy_node(state: SupportAgentState) -> Dict[str, Any]:
     return {"system_prompt": updated_state.get("system_prompt")}
 
 
-def evaluate_refund_request_node(state: SupportAgentState) -> SupportAgentState:
+def evaluate_refund_request_node(state: SupportAgentState) -> Dict[str, Any]:
     """Draft a response acknowledging the refund request.
 
     Placeholder implementation: the agent never auto-approves/denies a
@@ -265,31 +299,35 @@ def evaluate_refund_request_node(state: SupportAgentState) -> SupportAgentState:
     connect to a real payments/order system to make (or assist a support
     agent in making) the actual decision.
     """
-    state["refund_decision"] = "pending_manual_review"
-
-    llm = get_llm()
     prompt = prompts.REFUND_REQUEST_PROMPT.format(
         order_id=state.get("order_id", "Unspecified"),
         refund_reason=state.get("refund_reason", "Unspecified"),
         policy_context=state.get("system_prompt") or "",
-        user_input=state["user_input"],
+        user_input=state.get("user_input", ""),
     )
-    response = llm.invoke(prompt)
-    state["agent_response"] = response.content
-    return state
+    fallback = (
+        "Your refund request has been submitted for manual review. Our team "
+        "will follow up with you shortly."
+    )
+    content = _invoke_llm(prompt, fallback=fallback)
+    return {"refund_decision": "pending_manual_review", "agent_response": content}
 
 
 # --- Fallback ---
 
-def unknown_intent_node(state: SupportAgentState) -> SupportAgentState:
+def unknown_intent_node(state: SupportAgentState) -> Dict[str, Any]:
     """Handle messages that don't match any supported workflow.
 
     Future integration point: expand support workflow coverage (e.g.
     billing disputes, technical troubleshooting) and route to those instead
     of this fallback.
     """
-    state["agent_response"] = (
-        "I can currently help with password resets, order status, and "
-        "refund requests. Could you clarify which of these you need help with?"
-    )
-    return state
+    return {
+        "agent_response": (
+            "I can currently help with password resets, order status checks, "
+            "and submitting new refund requests. I'm not yet able to answer "
+            "general policy questions or check the status of an existing "
+            "request -- please reach out to support directly for those. "
+            "Could you tell me more about what you need?"
+        )
+    }

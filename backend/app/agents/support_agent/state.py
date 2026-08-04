@@ -12,7 +12,7 @@ SupportWorkflow = Literal[
 TicketPriority = Literal["Low", "Medium", "High"]
 
 
-class SupportAgentState(AgentState):
+class SupportAgentState(AgentState, total=False):
     """Support Agent state.
 
     Extends the shared core `AgentState` (messages, user_input, agent_response,
@@ -20,6 +20,12 @@ class SupportAgentState(AgentState):
     fields on a subclass -- instead of editing the shared `AgentState` -- means
     other agents built on the shared scaffold are unaffected by support-specific
     data. Mirrors the pattern used by `backend/app/agents/hr_agent/state.py`.
+
+    `total=False` marks every field declared on *this* subclass as optional
+    (per PEP 589, this does not affect the inherited `AgentState` fields,
+    which remain required) -- callers construct the initial state with only
+    the base `AgentState` fields, and each field below is filled in by a
+    later node as the graph runs. Matches `HRAgentState`'s convention.
     """
 
     # --- Ticket intake fields (set by ticket_intake_node, which runs before

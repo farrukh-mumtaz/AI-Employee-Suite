@@ -34,9 +34,13 @@ Respond with exactly one word, lowercase, no punctuation:
   locked out of an account, or account login issues.
 - "order_status" if the message is about tracking an order, delivery status,
   or "where is my order" type questions.
-- "refund_request" if the message is about requesting a refund, return, or
-  money back for a purchase.
-- "unknown" if it does not clearly match any of the above.
+- "refund_request" ONLY if the customer is actively asking for a refund,
+  return, or money back for a SPECIFIC purchase (their own order).
+- "unknown" for everything else, INCLUDING general questions about the
+  refund/return policy (e.g. "what's your return policy?") where the
+  customer is not actually asking for a refund on their own order. There is
+  no dedicated workflow for general policy questions yet, so they must not
+  be classified as "refund_request" even though they mention refunds.
 
 User message:
 {user_input}
