@@ -24,3 +24,16 @@ Tested retrieval accuracy with sample HR policy questions (`test_rag.py`) - retr
 
 - Currently using BGE-M3 as recommended. Other embedding models can be swapped in `core/embeddings.py` if needed.
 - Sample documents are HR-focused for testing; real documents can be ingested the same way via `ingest_docs.py`.
+
+## Performance Optimizations (Latest Update)
+
+- **Vector Index**: Added an IVFFlat index on the embedding column for faster similarity search as the document count grows.
+- **Query Caching**: Added an LRU cache (`@lru_cache`) on retrieval, so repeated identical queries are served instantly without hitting the database or re-computing embeddings.
+- **Finalized Tool Interface**: `make_rag_node(top_k)` lets any agent create a customized RAG node with its own top_k setting, making it a flexible, reusable tool across all agent graphs (HR, Sales, Support, Marketing).
+
+## Full Flow Testing
+
+Tested the complete pipeline end-to-end (`test_full_flow.py`):
+1. Retrieval accuracy - confirmed relevant documents are returned for sample queries
+2. Caching performance - confirmed repeated queries are significantly faster on second call
+3. Configurable node - confirmed `make_rag_node()` correctly customizes top_k per agent
