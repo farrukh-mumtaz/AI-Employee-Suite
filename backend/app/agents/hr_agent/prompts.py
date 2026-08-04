@@ -42,14 +42,34 @@ ONBOARDING_CHECKLIST_TEMPLATE = [
 
 # --- Leave Request prompts ---
 
-LEAVE_REQUEST_EVALUATION_PROMPT = """You are the HR Agent processing a leave request.
-Use the relevant policy context below (if any) to draft a short response to
-the employee acknowledging their request. Do NOT approve or deny the request
-yourself -- clearly state that it has been submitted for manual HR review.
+LEAVE_REQUEST_APPROVED_PROMPT = """You are the HR Agent confirming an approved leave request.
+Write a short, friendly confirmation (2-4 sentences) letting the employee
+know their leave request has been approved. Mention the leave type and
+dates, and acknowledge the reason if one was given. You may reference the
+policy context below if it is relevant.
 
 Leave type: {leave_type}
 Start date: {leave_start_date}
 End date: {leave_end_date}
+Reason: {leave_reason}
+
+Relevant policy context:
+{policy_context}
+
+User message:
+{user_input}
+"""
+
+LEAVE_REQUEST_REJECTED_PROMPT = """You are the HR Agent responding to a leave request that could not be
+automatically approved. Write a short, courteous message (2-4 sentences)
+explaining that the request needs manual HR review -- for example because
+some details were missing or unclear -- and that HR will follow up. Do NOT
+imply the request has been denied.
+
+Leave type: {leave_type}
+Start date: {leave_start_date}
+End date: {leave_end_date}
+Reason: {leave_reason}
 
 Relevant policy context:
 {policy_context}
