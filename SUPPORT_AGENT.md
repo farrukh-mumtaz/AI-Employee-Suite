@@ -20,16 +20,19 @@ customer support intake and triage from a single free-text message:
   shared RAG (Retrieval-Augmented Generation) pipeline, instead of relying
   on the LLM's general knowledge.
 
-Unlike the HR Agent, the Support Agent is **not yet exposed over HTTP** —
-there is no `api/support.py` router registered in `backend/app/main.py`.
-It's invoked directly by building the compiled graph and calling
-`.invoke()`, exactly as the test suite does (see [Example
-Requests](#10-example-requests)).
+Like the HR Agent, the Support Agent is exposed over HTTP via a single
+FastAPI endpoint, `POST /support/message` (`backend/app/api/support.py`,
+registered in `backend/app/main.py`), so any client can drive it without
+depending on LangGraph directly. It can also still be invoked directly by
+building the compiled graph and calling `.invoke()`, exactly as the test
+suite does (see [API Endpoints & Example Requests](#10-api-endpoints--example-requests)).
 
 The agent's underlying LLM calls use Groq (`llama-3.3-70b-versatile`) via
 `langchain_groq.ChatGroq`, configured once in
 `backend/app/core/llm_client.py` — the same factory every agent in this repo
-shares.
+shares. Every node that calls the LLM degrades to a deterministic fallback
+response if the call fails (mirroring the HR Agent's `_invoke_llm()`), so a
+Groq outage never crashes the graph.
 
 ## 2. Architecture
 
@@ -39,6 +42,15 @@ implementation), and reuses the shared RAG infrastructure rather than
 maintaining its own:
 
 ```
+FastAPI app (backend/app/main.py)
+    │
+    ├─ app.include_router(support_router)
+    │
+backend/app/api/support.py       <- HTTP boundary: request validation,
+    │                                graph invocation, error handling
+    │
+backend/app/schemas/support.py   <- Pydantic request/response contracts
+    │
 backend/app/agents/support_agent/
     ├─ graph.py                  <- StateGraph wiring (nodes + conditional edges)
     ├─ nodes.py                  <- Node functions (business logic)
@@ -74,14 +86,16 @@ backend/app/core/
 - **Graceful degradation** — a RAG retrieval failure (network, DB,
   embedding model) is caught and logged rather than crashing the graph; a
   malformed or low-confidence ticket-classification response degrades to
-  `"Unknown"` rather than propagating bad data.
-- **Node return style is mixed, by history rather than design** —
-  `ticket_intake_node`, `ticket_classification_node`, and
-  `retrieve_refund_policy_node` return partial-update dicts (the
-  LangGraph-recommended pattern, matching `hr_agent`); the rest of the
-  original nodes mutate and return the full state dict. Both are valid
-  LangGraph node contracts, but unifying them is a worthwhile future
-  cleanup (see [Future Improvements](#12-future-improvements)).
+  `"Unknown"` rather than propagating bad data. Every LLM-calling node
+  (intent classification, password reset, order status, refund) is wrapped
+  by a shared `_invoke_llm()` helper (mirroring `hr_agent.nodes._invoke_llm`)
+  that returns a deterministic fallback string on any LLM failure instead of
+  letting the exception crash the graph invocation.
+- **Partial-state-update node contract** — every node returns only the keys
+  it changes; LangGraph merges updates into the running state. This was
+  unified across all nodes (some previously mutated and returned the full
+  state dict, matching neither `hr_agent`'s convention nor each other) as
+  part of adding the LLM-failure resilience above.
 
 ## 3. LangGraph Flow
 
@@ -102,6 +116,14 @@ compiles the following flow:
 
 Every path — including the unknown fallback — ends with a populated
 `ticket_id`, `ticket_category`, `workflow`, and `agent_response`.
+
+`refund_request` requires the customer to be actively asking for a refund
+on their own purchase -- a general policy question ("what's your return
+policy?") does not qualify and is classified `unknown` instead, even though
+it mentions refunds/returns. Earlier testing found the looser prompt
+wording caused policy questions to be misrouted into `refund_request`,
+silently creating a phantom ticket with `refund_decision="pending_manual_review"`
+for a refund nobody asked for; see [Known Limitations](#13-known-limitations).
 
 ## 4. Graph Diagram
 
@@ -185,7 +207,9 @@ retrieve_refund_policy_node (nodes.py)
     -> rag_retrieval_node (backend/app/core/rag_node.py)
         -> retrieve_relevant_docs (backend/app/core/retrieval.py)
             -> embed_text (backend/app/core/embeddings.py, BAAI/bge-m3)
-            -> pgvector cosine-distance query over the Document table
+            -> dialect-aware document query over the Document table
+               (pgvector `<=>` cosine-distance on Postgres; a Python
+               cosine-similarity fallback on every other dialect)
         -> merges retrieved context into state["system_prompt"]
 ```
 
@@ -197,11 +221,16 @@ retrieve_refund_policy_node (nodes.py)
   try/except (mirroring `hr_agent.nodes.retrieve_leave_policy_node`'s
   pattern) — a retrieval/embedding/DB failure is logged and the graph
   continues with no policy context, rather than crashing.
-- **Environment prerequisites**: this pipeline needs a real **Postgres
-  database with the pgvector extension** (`DATABASE_URL` must not be
-  SQLite — pgvector's `<=>` cosine-distance operator has no SQLite
-  equivalent) and the `sentence-transformers` package (now pinned in
-  `requirements.txt`).
+- **Dialect-aware retrieval**: `retrieve_relevant_docs` (in
+  `core/retrieval.py`) checks `engine.dialect.name`. On **Postgres** it uses
+  the real pgvector `<=>` cosine-distance operator, ordering/limiting in
+  SQL — unchanged production behavior, requires the pgvector extension. On
+  any other dialect (**SQLite**, used for local dev/tests) it fetches all
+  rows and computes cosine similarity in Python instead, since pgvector's
+  operator has no SQLite equivalent (this used to raise
+  `sqlite3.OperationalError: near ">": syntax error` — see
+  `test_retrieval.py`). The `sentence-transformers` package (pinned in
+  `requirements.txt`) is required either way, for `embed_text`.
 - **Known gap**: no refund/support-specific documents have been ingested
   yet — only HR sample policy docs exist in the vector store today (via the
   root-level `ingest_docs.py`), and `retrieve_relevant_docs` has no
@@ -231,7 +260,8 @@ Responses](#11-example-responses).
 
 ```bash
 python -m pytest test_support_agent_graph.py test_support_agent_nodes.py \
-    test_support_agent_sample_tickets.py test_support_agent_comprehensive.py -v
+    test_support_agent_sample_tickets.py test_support_agent_comprehensive.py \
+    test_support_agent_api.py test_support_agent_resilience.py -v
 ```
 
 | Test file | Focus | Count |
@@ -240,36 +270,64 @@ python -m pytest test_support_agent_graph.py test_support_agent_nodes.py \
 | `test_support_agent_nodes.py` | `ticket_intake_node` unit tests (priority heuristic, field preservation) | 13 tests |
 | `test_support_agent_sample_tickets.py` | 25 realistic tickets across all 7 categories + unrelated/low-confidence requests, asserting category + workflow + response together | 4 tests, 25 subtests |
 | `test_support_agent_comprehensive.py` | Graph compilation, RAG success/failure, ticket-classification unit tests (all categories, confidence boundary, malformed input), invalid/empty/unicode/very-long input, unknown-intent, end-to-end state shape, state isolation | 35 tests |
+| `test_support_agent_api.py` | `/support/message` HTTP contract, validation, error handling (mirrors `test_hr_agent_api.py`) | 10 tests |
+| `test_support_agent_resilience.py` | LLM-failure fallback for every LLM-calling node (`_invoke_llm` regression coverage, mirrors `test_hr_agent_nodes.py`'s `RaisingLLM` tests); extraction nodes' "don't overwrite an existing field" contract | 12 tests |
 
-All tests are deterministic and require no network access or `GROQ_API_KEY`
-— the LLM is stubbed via `unittest.mock.patch` on `get_llm`, and the shared
-RAG node is stubbed via `patch.object` on `rag_retrieval_node`, consistent
-with the HR Agent suite's conventions.
+Plus two suites shared with the HR Agent (see `HR_AGENT.md` section 9):
+`test_cross_agent_routing.py` (deterministic HR↔Support routing isolation)
+and `test_live_llm_accuracy.py` (live-Groq accuracy regression, opt-in via
+`GROQ_API_KEY`); and `test_retrieval.py` (8 tests) for the shared
+`core/retrieval.py` dialect-routing fix that the RAG Integration section
+above describes — not Support-Agent-specific code, but what
+`retrieve_refund_policy_node` depends on.
 
-## 10. Example Requests
+All tests in this file's table are deterministic and require no network
+access or `GROQ_API_KEY` — the LLM is stubbed via `unittest.mock.patch` on
+`get_llm`, and the shared RAG node is stubbed via `patch.object` on
+`rag_retrieval_node`, consistent with the HR Agent suite's conventions.
 
-There is no HTTP endpoint yet, so the graph is invoked directly:
+## 10. API Endpoints & Example Requests
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/support/message` | Run one message through the Support Agent graph |
+
+**Request body** (`SupportAgentRequest`):
+```json
+{
+  "user_input": "string, required, min length 1"
+}
+```
+
+```bash
+# Refund request
+curl -X POST http://127.0.0.1:8000/support/message \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "I'\''d like a refund for order #4521, it arrived broken."}'
+
+# Password reset
+curl -X POST http://127.0.0.1:8000/support/message \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "I forgot my password and I'\''m locked out of my account."}'
+
+# General policy question (must NOT create a refund ticket -- see Known Limitations)
+curl -X POST http://127.0.0.1:8000/support/message \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "Just wondering what your return policy is."}'
+```
+
+**Error responses** (identical contract to `/hr/message` -- see `HR_AGENT.md` section 5):
+`422` on Pydantic validation failure (empty/missing/wrong-type `user_input`,
+malformed JSON body); `500` (with a `detail` field, no raw traceback) if the
+graph raises or completes with no `agent_response`.
+
+The graph can also still be invoked directly in Python, exactly as the test
+suite does:
 
 ```python
 from backend.app.agents.support_agent.graph import build_support_graph
 
 graph = build_support_graph()
-
-# Refund request
-graph.invoke({
-    "messages": [],
-    "user_input": "I'd like a refund for order #4521, it arrived broken.",
-    "agent_response": None,
-    "agent_name": "support_agent",
-})
-
-# Password reset
-graph.invoke({
-    "messages": [],
-    "user_input": "I forgot my password and I'm locked out of my account.",
-    "agent_response": None,
-    "agent_name": "support_agent",
-})
 
 # Billing (a recognized ticket category with no dedicated workflow branch)
 graph.invoke({
@@ -318,7 +376,7 @@ are independent):
   "ticket_category": "Billing",
   "ticket_category_confidence": 0.79,
   "workflow": "unknown",
-  "agent_response": "I can currently help with password resets, order status, and refund requests. Could you clarify which of these you need help with?"
+  "agent_response": "I can currently help with password resets, order status checks, and submitting new refund requests. I'm not yet able to answer general policy questions or check the status of an existing request -- please reach out to support directly for those. Could you tell me more about what you need?"
 }
 ```
 
@@ -330,16 +388,37 @@ are independent):
   "ticket_category": "Unknown",
   "ticket_category_confidence": 0.35,
   "workflow": "unknown",
-  "agent_response": "I can currently help with password resets, order status, and refund requests. Could you clarify which of these you need help with?"
+  "agent_response": "I can currently help with password resets, order status checks, and submitting new refund requests. I'm not yet able to answer general policy questions or check the status of an existing request -- please reach out to support directly for those. Could you tell me more about what you need?"
+}
+```
+
+**General policy question** (final state, abridged) — `"Just wondering what
+your return policy is."` A refund/return *policy* question, not an actual
+refund request. `ticket_category` may still land on `"Refund"` (it mentions
+refunds, for reporting purposes that's a reasonable tag), but `workflow`
+correctly stays `unknown` so no phantom pending-review refund ticket is
+created for a refund nobody asked for -- this is the specific misrouting
+this round of testing fixed (see [Known Limitations](#13-known-limitations)):
+```json
+{
+  "ticket_id": "TCK-6B9F0E12",
+  "ticket_status": "Open",
+  "ticket_category": "Refund",
+  "ticket_category_confidence": 0.85,
+  "workflow": "unknown",
+  "refund_decision": null,
+  "agent_response": "I can currently help with password resets, order status checks, and submitting new refund requests. I'm not yet able to answer general policy questions or check the status of an existing request -- please reach out to support directly for those. Could you tell me more about what you need?"
 }
 ```
 
 ## 12. Future Improvements
 
-- **HTTP API layer** — add `backend/app/api/support.py` +
-  `backend/app/schemas/support.py`, mirroring `api/hr.py`'s `POST
-  /hr/message` pattern, so the graph is reachable over HTTP like the HR
-  Agent.
+- **A dedicated policy-question / FAQ workflow** — general questions about
+  refund/return policy, order-status lookups without an order ID, etc.
+  currently route to `unknown` rather than being answered directly (see
+  [Known Limitations](#13-known-limitations)); a read-only FAQ branch,
+  grounded in the same RAG pipeline `retrieve_refund_policy_node` already
+  uses, would close this gap.
 - **Expand workflow coverage** — Billing, Technical Issue, Account Issue,
   and General Inquiry are recognized ticket categories but have no
   dedicated automated workflow yet; they all fall back to the clarification
@@ -348,20 +427,33 @@ are independent):
   placeholder `lookup_order_status`, `send_password_reset_node`, and
   `evaluate_refund_request_node`'s auto-review-only decision with real
   backend system calls.
-- **Structured LLM extraction** — replace the `setdefault("...",
-  "Unknown"/"Unspecified")` placeholders in the extraction nodes with real
-  structured extraction (tool/function calling) or explicit form input.
+- **Structured LLM extraction** — replace the `"Unknown"`/`"Unspecified"`
+  placeholder defaults in the extraction nodes with real structured
+  extraction (tool/function calling) or explicit form input.
 - **Ingest real support/refund documents and scope retrieval by source** —
   only HR sample documents exist in the vector store today;
   `core/retrieval.py`'s `retrieve_relevant_docs` also has no per-agent
   source filter, so a populated multi-domain store would currently mix
   results across agents.
-- **Unify node return style** — some nodes return partial-update dicts
-  (`ticket_intake_node`, `ticket_classification_node`,
-  `retrieve_refund_policy_node`), others mutate and return the full state;
-  worth standardizing on the partial-dict convention throughout.
 - **Conversation persistence** — invocation is currently stateless (one
   message in, one response out); LangGraph checkpointing would enable
   multi-turn conversations.
 - **Rate limiting / request logging** — no throttling or structured request
   logging exists yet, same gap noted in `HR_AGENT.md`.
+
+## 13. Known Limitations
+
+- **No dedicated workflow for general policy/status questions.**
+  `classify_intent_node` intentionally routes these to `unknown` rather than
+  `refund_request` (fixed in this round of testing -- see
+  `WEEKLY_TESTING_SUMMARY.md`), since `evaluate_refund_request_node` always
+  creates a `refund_decision="pending_manual_review"` record and previously
+  did so even for customers who were only asking a policy question, never
+  requesting a refund. The `unknown` fallback message tells the user to
+  contact support directly for these until a dedicated workflow exists.
+- **Placeholder extraction/lookups remain unchanged** — `account_email`,
+  `order_id`, and `refund_reason` are still simple defaults
+  (`"Unknown"`/`"Unspecified"`) rather than real extraction, and
+  `lookup_order_status` returns a fixed placeholder string; both are
+  pre-existing, documented gaps (see [Future Improvements](#12-future-improvements)),
+  not new defects from this round of fixes.

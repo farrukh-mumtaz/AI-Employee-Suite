@@ -29,8 +29,11 @@ from backend.app.agents.support_agent.graph import build_support_graph
 from backend.app.agents.support_agent.rag import lookup_order_status
 
 _UNKNOWN_INTENT_RESPONSE = (
-    "I can currently help with password resets, order status, and "
-    "refund requests. Could you clarify which of these you need help with?"
+    "I can currently help with password resets, order status checks, "
+    "and submitting new refund requests. I'm not yet able to answer "
+    "general policy questions or check the status of an existing "
+    "request -- please reach out to support directly for those. "
+    "Could you tell me more about what you need?"
 )
 
 

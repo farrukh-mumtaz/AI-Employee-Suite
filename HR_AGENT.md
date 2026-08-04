@@ -103,6 +103,16 @@ Any message that doesn't match either workflow (or carries no usable
 input) returns a clarification message asking the user to specify
 onboarding or leave.
 
+This deliberately includes messages that *mention* leave but aren't a new
+time-off submission -- leave policy questions ("what's our policy on
+parental leave?"), balance inquiries ("how many vacation days do I have
+left?"), and status checks on an already-submitted request. `evaluate_leave_request_node`
+only knows how to auto-approve/flag-for-review a **new** request; earlier
+testing found that classifying these as `leave_request` anyway produced a
+misleading response (e.g. telling someone who only asked a policy question
+that "your leave request needs manual review"). `CLASSIFY_INTENT_PROMPT`
+now explicitly routes them to `unknown` instead -- see [Known Limitations](#12-known-limitations).
+
 ## 4. Graph Structure
 
 `build_hr_graph()` in `backend/app/agents/hr_agent/graph.py` compiles the
@@ -301,6 +311,12 @@ python -m pytest test_hr_agent_nodes.py -v        # node unit tests
 python -m pytest test_hr_agent_graph.py -v         # conditional-edge routing
 python -m pytest test_hr_agent_comprehensive.py -v # graph compilation, RAG, invalid input, state isolation
 python -m pytest test_hr_agent_api.py -v           # FastAPI endpoint (happy path, validation, error handling)
+
+# Cross-agent routing (deterministic; also exercises the Support Agent side)
+python -m pytest test_cross_agent_routing.py -v
+
+# Live-LLM accuracy regression (real Groq call; needs GROQ_API_KEY, auto-skips otherwise)
+python -m pytest test_live_llm_accuracy.py -v
 ```
 
 | Test file | Focus |
@@ -311,6 +327,8 @@ python -m pytest test_hr_agent_api.py -v           # FastAPI endpoint (happy pat
 | `test_hr_agent_graph.py` | Conditional-edge selector functions |
 | `test_hr_agent_comprehensive.py` | Graph compilation, RAG, invalid/empty input, state isolation |
 | `test_hr_agent_api.py` | `/hr/message` HTTP contract, validation, error handling |
+| `test_cross_agent_routing.py` | Support-domain input through the HR graph/API (and vice versa) stays isolated to `workflow="unknown"` |
+| `test_live_llm_accuracy.py` | Real-Groq regression coverage for the `CLASSIFY_INTENT_PROMPT` fix (policy/balance/status questions must not be misrouted to `leave_request`) |
 
 ## 10. Project Structure
 
@@ -339,13 +357,21 @@ backend/
     db/
       database.py                 SQLModel engine/session
 test_hr_agent*.py                 HR Agent test suite (repo root)
+test_cross_agent_routing.py       Cross-agent routing isolation (HR + Support)
+test_live_llm_accuracy.py         Live-Groq classification accuracy regression (HR + Support)
 HR_AGENT.md                       This document
 HR_AGENT_TEST_REPORT.md           Test report: initial comprehensive suite
 HR_AGENT_TEST_REPORT_LEAVE_AND_API.md  Test report: leave-reason + API coverage
+WEEKLY_TESTING_SUMMARY.md         Weekly bug-fix / accuracy / testing summary
 ```
 
 ## 11. Future Improvements
 
+- **A dedicated leave-inquiry workflow** — policy questions, balance
+  checks, and status lookups on an existing request currently route to the
+  `unknown` fallback (see [Known Limitations](#12-known-limitations)) rather
+  than being answered directly; a read-only workflow branch for these would
+  close that gap without touching the submission workflow.
 - **Real semantic retrieval** — replace `rag.py`'s keyword matching with a
   vector store (pgvector/Chroma/Pinecone) over actual HR policy documents.
 - **Structured LLM extraction** — replace the regex heuristics in
@@ -372,3 +398,18 @@ HR_AGENT_TEST_REPORT_LEAVE_AND_API.md  Test report: leave-reason + API coverage
   would remove the current `DeprecationWarning`.
 - **Rate limiting / request logging** — no throttling or structured
   request logging exists yet at the API layer.
+
+## 12. Known Limitations
+
+- **No dedicated workflow for leave policy/balance/status questions.**
+  `classify_intent_node` intentionally routes these to `unknown` rather than
+  `leave_request` (fixed in this round of testing -- see
+  `WEEKLY_TESTING_SUMMARY.md`), since `evaluate_leave_request_node` can only
+  evaluate a *new* submission and previously produced a misleading "your
+  request needs manual review" response for messages that were never a
+  request at all. The `unknown` fallback message tells the user to contact
+  HR directly for these until a dedicated workflow exists.
+- **Extraction heuristics remain regex/keyword-based** (see `extraction.py`)
+  — unusual phrasing (no article before a job title, an unrecognized leave
+  type keyword) still falls back to `"Unknown"`/`"Unspecified"`. Documented,
+  not a defect; see `HR_AGENT_TEST_REPORT.md`.
