@@ -26,3 +26,17 @@ reworded versions of the same idea.
 
 Respond ONLY in this JSON format, nothing else:
 {{"ideas": ["idea 1 here", "idea 2 here", "idea 3 here"]}}"""
+
+CONTENT_CALENDAR_PROMPT = """{system_prompt}
+
+You are planning a content calendar for the following:
+
+Topic/product: {content_topic}
+Time period: {calendar_period}
+
+Generate a spread of content ideas across this period. For each entry, include
+a day label, a suggested platform, and a short content idea. Vary the content
+types and platforms across the period rather than repeating the same idea.
+
+Respond ONLY in this JSON format, nothing else:
+{{"calendar": [{{"day": "Day 1", "platform": "instagram", "idea": "short idea here"}}, ...]}}"""
