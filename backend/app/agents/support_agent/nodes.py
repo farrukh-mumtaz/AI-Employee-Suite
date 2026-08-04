@@ -5,13 +5,18 @@
 # reads/writes fields on it, and returns it. The LLM is always obtained via
 # the shared `get_llm()` factory so model/provider swaps happen in one place.
 # Mirrors the structure of hr_agent/nodes.py.
+import json
+import logging
 import uuid
 from typing import Any, Dict
 
 from backend.app.agents.support_agent import prompts
-from backend.app.agents.support_agent.rag import lookup_order_status, retrieve_refund_policy
+from backend.app.agents.support_agent.rag import lookup_order_status
 from backend.app.agents.support_agent.state import SupportAgentState
 from backend.app.core.llm_client import get_llm
+from backend.app.core.rag_node import rag_retrieval_node
+
+logger = logging.getLogger(__name__)
 
 # --- Ticket intake helpers ---
 #
@@ -34,6 +39,24 @@ _LOW_PRIORITY_KEYWORDS = (
 # classify_intent_node's later, LLM-based `workflow` classification is the
 # actual routing signal in the meantime.
 _DEFAULT_ISSUE_CATEGORY = "General Support"
+
+# --- Ticket classification (ticket_classification_node) ---
+#
+# Business/reporting categories -- distinct from classify_intent_node's
+# `workflow` values, which only exist to pick a graph branch. No project-wide
+# confidence threshold exists anywhere else in the repo (checked HR, Sales,
+# Marketing); this is a new, locally-scoped constant, same pattern as the
+# priority keyword sets above.
+_TICKET_CATEGORIES = (
+    "Refund",
+    "Password Reset",
+    "Billing",
+    "Technical Issue",
+    "Account Issue",
+    "Order Status",
+    "General Inquiry",
+)
+_TICKET_CATEGORY_CONFIDENCE_THRESHOLD = 0.6
 
 
 def _determine_ticket_priority(user_input: str) -> str:
@@ -75,6 +98,41 @@ def ticket_intake_node(state: SupportAgentState) -> Dict[str, Any]:
     return updates
 
 
+def ticket_classification_node(state: SupportAgentState) -> Dict[str, Any]:
+    """Classify the ticket into a business/reporting category with a
+    confidence score, independent of classify_intent_node's routing
+    decision -- runs right after ticket_intake, before the graph forks on
+    `workflow`, so it never influences which branch the request takes.
+
+    Uses the same strict-JSON LLM response convention as
+    sales_agent.lead_qualification_node / marketing_agent.generate_content_node
+    (classify_intent_node's single-bare-word format can't carry a numeric
+    confidence). Falls back to "Unknown" -- both when the LLM's chosen
+    category isn't one of the recognized ones, and when its confidence is
+    below `_TICKET_CATEGORY_CONFIDENCE_THRESHOLD` -- so low-confidence or
+    malformed classifications never masquerade as a real category.
+    """
+    user_input = (state.get("user_input") or "").strip()
+    if not user_input:
+        return {"ticket_category": "Unknown", "ticket_category_confidence": 0.0}
+
+    llm = get_llm()
+    prompt = prompts.TICKET_CLASSIFICATION_PROMPT.format(user_input=user_input)
+    try:
+        response = llm.invoke(prompt)
+        result = json.loads(response.content)
+        category = str(result.get("category", "")).strip()
+        confidence = float(result.get("confidence", 0.0))
+    except Exception:
+        logger.exception("Ticket classification failed; defaulting to Unknown")
+        return {"ticket_category": "Unknown", "ticket_category_confidence": 0.0}
+
+    if category not in _TICKET_CATEGORIES or confidence < _TICKET_CATEGORY_CONFIDENCE_THRESHOLD:
+        category = "Unknown"
+
+    return {"ticket_category": category, "ticket_category_confidence": confidence}
+
+
 def classify_intent_node(state: SupportAgentState) -> SupportAgentState:
     """Entry node: decide whether this request is a password reset, order
     status check, refund request, or unknown, and store the result on
@@ -86,7 +144,7 @@ def classify_intent_node(state: SupportAgentState) -> SupportAgentState:
     selection from the frontend (e.g. the user clicked "Request a refund").
     """
     llm = get_llm()
-    prompt = prompts.CLASSIFY_INTENT_PROMPT.format(user_input=state["user_input"])
+    prompt = prompts.CLASSIFY_INTENT_PROMPT.format(user_input=state.get("user_input") or "")
     response = llm.invoke(prompt)
     intent = response.content.strip().lower()
 
@@ -182,15 +240,21 @@ def extract_refund_details_node(state: SupportAgentState) -> SupportAgentState:
     return state
 
 
-def retrieve_refund_policy_node(state: SupportAgentState) -> SupportAgentState:
-    """Fetch relevant refund policy snippets for the request via rag.py.
+def retrieve_refund_policy_node(state: SupportAgentState) -> Dict[str, Any]:
+    """Fetch relevant refund policy context via the shared RAG node
+    (backend/app/core/rag_node.py), which retrieves from the real pgvector
+    document store and merges the result into `system_prompt`.
 
-    Future integration point: rag.py currently does keyword matching over a
-    hardcoded list; swap in real semantic retrieval once a policy document
-    store exists.
+    Wrapped in try/except so a retrieval/embedding failure degrades
+    gracefully instead of crashing the graph -- mirrors
+    retrieve_leave_policy_node's pattern in hr_agent/nodes.py.
     """
-    state["refund_policy_context"] = retrieve_refund_policy(state["user_input"])
-    return state
+    try:
+        updated_state = rag_retrieval_node(dict(state))
+    except Exception:
+        logger.exception("Refund policy retrieval failed; continuing with no context")
+        return {}
+    return {"system_prompt": updated_state.get("system_prompt")}
 
 
 def evaluate_refund_request_node(state: SupportAgentState) -> SupportAgentState:
@@ -207,7 +271,7 @@ def evaluate_refund_request_node(state: SupportAgentState) -> SupportAgentState:
     prompt = prompts.REFUND_REQUEST_PROMPT.format(
         order_id=state.get("order_id", "Unspecified"),
         refund_reason=state.get("refund_reason", "Unspecified"),
-        policy_context="\n".join(state.get("refund_policy_context") or []),
+        policy_context=state.get("system_prompt") or "",
         user_input=state["user_input"],
     )
     response = llm.invoke(prompt)
