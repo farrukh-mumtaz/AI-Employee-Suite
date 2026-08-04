@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from sqlmodel import Session, select
 from backend.app.db.database import engine
 from backend.app.models.document import Document
@@ -15,8 +17,11 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-# Given a user's question, finds the most relevant documents from the vector database.
-def retrieve_relevant_docs(query: str, top_k: int = 3) -> list[str]:
+# This cache stores results for repeated queries, so identical questions don't
+# re-run the embedding model or hit the database again. maxsize=100 keeps the
+# 100 most recent unique queries cached.
+@lru_cache(maxsize=100)
+def _cached_retrieve(query: str, top_k: int) -> tuple:
     query_embedding = embed_text(query)
 
     with Session(engine) as session:
@@ -28,7 +33,8 @@ def retrieve_relevant_docs(query: str, top_k: int = 3) -> list[str]:
                 .order_by(Document.embedding.cosine_distance(query_embedding))
                 .limit(top_k)
             ).all()
-            return [doc.content for doc in results]
+            # Returning a tuple (not a list) because lru_cache requires hashable/consistent return types
+            return tuple(doc.content for doc in results)
 
         # Non-Postgres dialects (SQLite, used for local dev/tests) have no
         # equivalent to pgvector's `<=>` operator -- it's Postgres-specific
@@ -42,4 +48,10 @@ def retrieve_relevant_docs(query: str, top_k: int = 3) -> list[str]:
             key=lambda doc: _cosine_similarity(doc.embedding, query_embedding),
             reverse=True,
         )
-        return [doc.content for doc in scored[:top_k]]
+        return tuple(doc.content for doc in scored[:top_k])
+
+
+# Given a user's question, finds the most relevant documents from the vector database.
+# Uses caching so repeated identical queries are instant.
+def retrieve_relevant_docs(query: str, top_k: int = 3) -> list[str]:
+    return list(_cached_retrieve(query, top_k))
