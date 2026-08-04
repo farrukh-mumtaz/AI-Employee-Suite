@@ -4,6 +4,28 @@
 # for a prompt-management system / versioned prompt store) without touching
 # graph wiring or node logic. Mirrors hr_agent/prompts.py.
 
+TICKET_CLASSIFICATION_PROMPT = """You are a ticket classification system for customer support.
+Read the user's message and classify it into exactly one of these categories:
+- "Refund" -- requesting a refund, return, or money back for a purchase.
+- "Password Reset" -- resetting a password or being locked out of an account.
+- "Billing" -- payment methods, charges, invoices, or subscription costs.
+- "Technical Issue" -- something in the product/app/website not working.
+- "Account Issue" -- account settings, profile, or access problems that are
+  not specifically a password reset.
+- "Order Status" -- tracking an order, delivery status, or "where is my
+  order" type questions.
+- "General Inquiry" -- anything else, including questions that don't clearly
+  fit one of the categories above.
+
+Also give a confidence score from 0.0 to 1.0 for how certain you are.
+
+Respond ONLY in this JSON format, nothing else:
+{{"category": "<one of the categories above>", "confidence": <float between 0.0 and 1.0>}}
+
+User message:
+{user_input}
+"""
+
 CLASSIFY_INTENT_PROMPT = """You are an intent classifier for a customer support assistant.
 Read the user's message and decide which support workflow it belongs to.
 

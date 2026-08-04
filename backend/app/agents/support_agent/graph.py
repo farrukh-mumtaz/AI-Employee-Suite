@@ -17,6 +17,7 @@ from backend.app.agents.support_agent.nodes import (
     retrieve_order_status_node,
     retrieve_refund_policy_node,
     send_password_reset_node,
+    ticket_classification_node,
     ticket_intake_node,
     unknown_intent_node,
 )
@@ -33,7 +34,7 @@ def build_support_graph():
     """Build and compile the Support Agent graph.
 
     Flow:
-        ticket_intake -> classify_intent
+        ticket_intake -> ticket_classification -> classify_intent
             -> password_reset branch: extract_account_details
                -> send_password_reset -> END
             -> order_status branch: extract_order_details -> retrieve_order_status
@@ -41,10 +42,16 @@ def build_support_graph():
             -> refund_request branch: extract_refund_details -> retrieve_refund_policy
                -> evaluate_refund_request -> END
             -> unknown branch: unknown_intent -> END
+
+    ticket_classification runs as a plain linear step between ticket_intake
+    and classify_intent: it assigns a business/reporting category (with a
+    confidence score) independently of `workflow`, and never affects which
+    branch the conditional edge below picks.
     """
     graph = StateGraph(SupportAgentState)
 
     graph.add_node("ticket_intake", ticket_intake_node)
+    graph.add_node("ticket_classification", ticket_classification_node)
     graph.add_node("classify_intent", classify_intent_node)
 
     # Password reset branch
@@ -65,7 +72,8 @@ def build_support_graph():
     graph.add_node("unknown_intent", unknown_intent_node)
 
     graph.set_entry_point("ticket_intake")
-    graph.add_edge("ticket_intake", "classify_intent")
+    graph.add_edge("ticket_intake", "ticket_classification")
+    graph.add_edge("ticket_classification", "classify_intent")
 
     graph.add_conditional_edges(
         "classify_intent",

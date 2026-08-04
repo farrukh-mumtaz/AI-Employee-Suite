@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 from backend.app.core.state import AgentState
 
@@ -33,6 +33,14 @@ class SupportAgentState(AgentState):
     # which workflow branch (password reset / order status / refund) to run.
     workflow: SupportWorkflow
 
+    # --- Ticket classification fields (set by ticket_classification_node,
+    # which runs after ticket_intake and before classify_intent) ---
+    # Business/reporting category -- distinct from `workflow` above, which
+    # only exists to pick a graph branch. "Unknown" when the LLM's category
+    # wasn't recognized or its confidence fell below the project threshold.
+    ticket_category: Optional[str]
+    ticket_category_confidence: Optional[float]
+
     # --- Password Reset flow fields ---
     account_email: Optional[str]
     reset_link_sent: Optional[bool]
@@ -42,10 +50,10 @@ class SupportAgentState(AgentState):
     order_status: Optional[str]
 
     # --- Refund Request flow fields ---
+    # Retrieved refund-policy context (via the shared RAG node in
+    # nodes.py's retrieve_refund_policy_node) is carried in the inherited
+    # `system_prompt` field, not a dedicated field here.
     refund_reason: Optional[str]
-    # Populated by rag.py's placeholder retrieval step. Future integration
-    # point for a real refund-policy knowledge base / vector store.
-    refund_policy_context: Optional[List[str]]
     # Placeholder decision ("pending_manual_review", etc.) until real refund
     # eligibility / approval-workflow logic is implemented.
     refund_decision: Optional[str]
