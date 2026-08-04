@@ -73,3 +73,20 @@ result_b = app.invoke({
 print("Content:", result_b.get("generated_content"))
 print()
 print("Same output both times?", result_a.get("generated_content") == result_b.get("generated_content"))
+
+# Finalize check: invalid workflow value
+print("=== Test 11: Invalid workflow value ===")
+try:
+    result = app.invoke({
+        "messages": [], "user_input": None, "agent_response": None,
+        "agent_name": "marketing", "system_prompt": "You are a marketing assistant.",
+        "workflow": "campaing_ideas",  # deliberate typo
+        "content_topic": "test", "platform": None,
+        "generated_content": None, "tone": None,
+        "campaign_goal": None, "campaign_ideas": None,
+        "calendar_period": None, "content_calendar": None,
+        "ab_variant_a": None, "ab_variant_b": None, "ab_rationale": None,
+    })
+    print("Result:", result)
+except Exception as e:
+    print(f"CRASHED: {type(e).__name__}: {e}")

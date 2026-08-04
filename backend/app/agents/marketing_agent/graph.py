@@ -16,8 +16,9 @@ from backend.app.agents.marketing_agent.state import MarketingContentState
 
 
 def _route_by_workflow(state: MarketingContentState) -> str:
-    return state.get("workflow", "content")
-
+    valid_workflows = {"content", "campaign_ideas", "content_calendar", "ab_suggestion"}
+    workflow = state.get("workflow")
+    return workflow if workflow in valid_workflows else "content"
 
 def build_marketing_graph():
     """Build and compile the Marketing Agent graph.
