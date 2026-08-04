@@ -3,6 +3,12 @@ from backend.app.agents.marketing_agent.prompts import (
     CONTENT_GENERATION_PROMPT,
     CAMPAIGN_IDEA_PROMPT,
     CONTENT_CALENDAR_PROMPT,
+    AB_SUGGESTION_PROMPT,
+)
+from backend.app.agents.marketing_agent.prompts import (
+    CONTENT_GENERATION_PROMPT,
+    CAMPAIGN_IDEA_PROMPT,
+    CONTENT_CALENDAR_PROMPT,
 )
 from backend.app.agents.marketing_agent.prompts import (
     CONTENT_GENERATION_PROMPT,
@@ -60,4 +66,23 @@ def generate_content_calendar_node(state: MarketingContentState) -> MarketingCon
     result = json.loads(response.content)
 
     state["content_calendar"] = result["calendar"]
+    return state
+
+def generate_ab_suggestion_node(state: MarketingContentState) -> MarketingContentState:
+    """Generates two distinct content variants for A/B testing, with rationale."""
+    llm = get_llm()
+
+    prompt = AB_SUGGESTION_PROMPT.format(
+        system_prompt=state.get("system_prompt") or "You are a marketing assistant.",
+        content_topic=state.get("content_topic", "our product"),
+        platform=state.get("platform", "social media"),
+        tone=state.get("tone", "friendly"),
+    )
+
+    response = llm.invoke(prompt)
+    result = json.loads(response.content)
+
+    state["ab_variant_a"] = result["variant_a"]
+    state["ab_variant_b"] = result["variant_b"]
+    state["ab_rationale"] = result["rationale"]
     return state

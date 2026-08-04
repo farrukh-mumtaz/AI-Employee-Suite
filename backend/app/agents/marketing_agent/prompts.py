@@ -40,3 +40,23 @@ types and platforms across the period rather than repeating the same idea.
 
 Respond ONLY in this JSON format, nothing else:
 {{"calendar": [{{"day": "Day 1", "platform": "instagram", "idea": "short idea here"}}, ...]}}"""
+
+AB_SUGGESTION_PROMPT = """{system_prompt}
+
+You are creating an A/B test for the following:
+
+Topic/product: {content_topic}
+Platform: {platform}
+Tone: {tone}
+
+Write TWO distinctly different versions of content for this - Variant A and
+Variant B - that test a genuinely different angle or hook (e.g. one leads
+with a question, the other leads with a bold statement; or one emphasizes
+urgency, the other emphasizes value). They should not just be reworded
+versions of each other.
+
+Also briefly explain what specifically differs between them and why that
+difference is worth testing.
+
+Respond ONLY in this JSON format, nothing else:
+{{"variant_a": "content here", "variant_b": "content here", "rationale": "brief explanation of what's being tested and why"}}"""
