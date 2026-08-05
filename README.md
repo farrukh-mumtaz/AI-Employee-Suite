@@ -18,6 +18,8 @@ By the end of the 8-week development cycle, this repository will contain:
 
 * **CEO Dashboard**
 
+* **Agent Orchestrator** — see [ORCHESTRATOR.md](ORCHESTRATOR.md) for full documentation (integration flow, router architecture, testing).
+
 
 ## GitHub Rules & Workflow
 
