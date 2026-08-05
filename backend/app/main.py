@@ -5,6 +5,7 @@ from backend.app.db.database import engine
 from backend.app import models  # ensures all models are registered
 from backend.app.api.auth import router as auth_router
 from backend.app.api.hr import router as hr_router
+from backend.app.api.orchestrator import router as orchestrator_router
 from backend.app.api.support import router as support_router
 
 app = FastAPI(title="AI Employee Suite Backend")
@@ -18,6 +19,7 @@ def on_startup():
 app.include_router(auth_router)
 app.include_router(hr_router)
 app.include_router(support_router)
+app.include_router(orchestrator_router)
 
 @app.get("/")
 def read_root():
