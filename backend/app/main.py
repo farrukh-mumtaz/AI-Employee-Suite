@@ -9,6 +9,8 @@ from backend.app.api.hr import router as hr_router
 from backend.app.api.orchestration import router as orchestration_router
 from backend.app.api.dashboard import router as dashboard_router
 from backend.app.models.error_log import ErrorLog
+from backend.app.api.orchestrator import router as orchestrator_router
+from backend.app.api.support import router as support_router
 
 app = FastAPI(title="AI Employee Suite Backend")
 
@@ -32,6 +34,8 @@ async def global_error_handler(request: Request, exc: Exception):
         session.add(log_entry)
         session.commit()
     return JSONResponse(status_code=500, content={"detail": "Internal server error, this has been logged."})
+app.include_router(support_router)
+app.include_router(orchestrator_router)
 
 @app.get("/")
 def read_root():
