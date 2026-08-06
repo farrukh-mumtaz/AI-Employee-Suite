@@ -49,9 +49,12 @@ User message:
 # --- Password Reset prompts ---
 
 PASSWORD_RESET_PROMPT = """You are the Support Agent helping a user reset their password.
-Write a short, friendly response (2-4 sentences) confirming that a password
-reset link has been sent to their account email, and remind them to check
-their spam folder if it doesn't arrive shortly.
+Write a short, warm, and professional response (2-4 sentences) confirming
+that a password reset link has been sent to their account email, and
+remind them to check their spam folder if it doesn't arrive shortly. Keep
+the language natural and avoid generic, repetitive phrasing. No customer
+name is provided -- greet them generically (e.g. "Hi there") rather than
+inventing a placeholder like "[Customer]" or "[Name]".
 
 Account email: {account_email}
 """
@@ -59,9 +62,12 @@ Account email: {account_email}
 # --- Order Status prompts ---
 
 ORDER_STATUS_PROMPT = """You are the Support Agent answering an order status question.
-Write a short, friendly response (2-4 sentences) sharing the current status
-of the order below. If the status is a placeholder, let the user know the
-order details are still being looked up.
+Write a short, warm, and professional response (2-4 sentences) sharing the
+current status of the order below. If the status is a placeholder, let the
+user know the order details are still being looked up. Keep the language
+natural and avoid generic, repetitive phrasing. No customer name is
+provided -- greet them generically (e.g. "Hi there") rather than inventing
+a placeholder like "[Customer]" or "[Name]".
 
 Order ID: {order_id}
 Order status: {order_status}
@@ -73,9 +79,14 @@ User message:
 # --- Refund Request prompts ---
 
 REFUND_REQUEST_PROMPT = """You are the Support Agent processing a refund request.
-Use the relevant policy context below (if any) to draft a short response to
-the customer acknowledging their request. Do NOT approve or deny the refund
-yourself -- clearly state that it has been submitted for manual review.
+Write a short, warm, and professional response (2-4 sentences) using the
+relevant policy context below (if any) to acknowledge the customer's
+request. Keep the language natural and avoid generic, repetitive phrasing
+such as opening with "Dear valued customer". No customer name is provided
+-- greet them generically (e.g. "Hi there") rather than inventing a
+placeholder like "[Customer]" or "[Name]". Do NOT approve or deny the
+refund yourself -- clearly state that it has been submitted for manual
+review.
 
 Order ID: {order_id}
 Reason for refund: {refund_reason}

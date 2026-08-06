@@ -85,19 +85,84 @@ backend/app/core/
   agent are unaffected by support-specific fields.
 - **Graceful degradation** — a RAG retrieval failure (network, DB,
   embedding model) is caught and logged rather than crashing the graph; a
-  malformed or low-confidence ticket-classification response degrades to
-  `"Unknown"` rather than propagating bad data. Every LLM-calling node
+  malformed or low-confidence ticket-classification response, or a failure
+  to obtain an LLM client at all (e.g. a missing/invalid `GROQ_API_KEY`),
+  degrades `ticket_classification_node` to `"Unknown"` rather than
+  propagating bad data or crashing the graph. Every LLM-calling node
   (intent classification, password reset, order status, refund) is wrapped
   by a shared `_invoke_llm()` helper (mirroring `hr_agent.nodes._invoke_llm`)
   that returns a deterministic fallback string on any LLM failure instead of
-  letting the exception crash the graph invocation.
+  letting the exception crash the graph invocation; `ticket_classification_node`
+  has its own equivalent try/except (its JSON-classification response shape
+  doesn't fit `_invoke_llm`'s plain-string return), covering LLM-client
+  construction failures the same way, not just `.invoke()`/parsing failures.
 - **Partial-state-update node contract** — every node returns only the keys
   it changes; LangGraph merges updates into the running state. This was
   unified across all nodes (some previously mutated and returned the full
   state dict, matching neither `hr_agent`'s convention nor each other) as
   part of adding the LLM-failure resilience above.
 
-## 3. LangGraph Flow
+## 3. Workflow Description & LangGraph Flow
+
+### Password Reset
+
+1. A message like *"I forgot my password and can't log in"* arrives.
+2. `ticket_intake` opens a ticket; `ticket_classification` tags it (e.g.
+   `Password Reset`) independently of routing.
+3. The intent classifier recognizes it as `password_reset`.
+4. `account_email` is set to `"Unknown"` unless already supplied on the
+   state (placeholder extraction -- see [Known Limitations](#13-known-limitations)).
+5. An LLM-generated confirmation is produced acknowledging the reset link
+   was sent, with a deterministic fallback if the LLM call fails.
+
+### Order Status
+
+1. A message like *"Where is my order ORD-12345?"* arrives.
+2. The intent classifier recognizes it as `order_status`.
+3. `order_id` is set to `"Unspecified"` unless already supplied (same
+   placeholder caveat as password reset).
+4. `lookup_order_status` returns a fixed placeholder status (no real
+   order-management system is wired up yet).
+5. An LLM-generated response summarizes the status, referencing the order
+   ID mentioned in the original message even though the structured field
+   stays a placeholder.
+
+### Refund Request
+
+1. A message like *"I want a refund for order ORD-777, it arrived broken"*
+   arrives.
+2. The intent classifier recognizes it as `refund_request` -- ONLY when the
+   customer is asking for a refund on their own purchase, not asking a
+   general policy question (see below).
+3. `order_id` and `refund_reason` default to `"Unspecified"` unless already
+   supplied.
+4. Relevant refund-policy context is retrieved from the real document store
+   via the shared RAG pipeline (see [RAG Integration](#7-rag-integration)).
+5. The agent never auto-approves or denies the refund -- it always sets
+   `refund_decision="pending_manual_review"` and drafts a response
+   acknowledging the request, grounded in the retrieved policy context.
+
+### Unknown / Fallback
+
+Any message that doesn't match a supported workflow (or carries no usable
+input) returns a fixed clarification message listing what the agent can
+currently help with, with no LLM call.
+
+This deliberately includes messages that *mention* refunds/orders but
+aren't an actual new request -- general policy questions ("what's your
+return policy?"), billing disputes, and status checks on an
+already-submitted request. `evaluate_refund_request_node` only knows how to
+acknowledge a **new** refund request; earlier testing found that
+classifying policy questions as `refund_request` anyway silently created a
+phantom ticket with `refund_decision="pending_manual_review"` for a refund
+nobody asked for. `CLASSIFY_INTENT_PROMPT` now explicitly routes them to
+`unknown` instead -- see [Known Limitations](#13-known-limitations). Note
+that `ticket_category` (business/reporting classification) is independent
+of `workflow` (routing) -- a policy question can still land on
+`ticket_category="Refund"` for reporting purposes while `workflow` stays
+`unknown`; see [Ticket Classification](#6-ticket-classification).
+
+### LangGraph Flow
 
 `build_support_graph()` in `backend/app/agents/support_agent/graph.py`
 compiles the following flow:
@@ -269,14 +334,14 @@ python -m pytest test_support_agent_graph.py test_support_agent_nodes.py \
 | `test_support_agent_graph.py` | End-to-end graph invocation for all 3 workflows + unknown fallback; ticket creation | 5 tests |
 | `test_support_agent_nodes.py` | `ticket_intake_node` unit tests (priority heuristic, field preservation) | 13 tests |
 | `test_support_agent_sample_tickets.py` | 25 realistic tickets across all 7 categories + unrelated/low-confidence requests, asserting category + workflow + response together | 4 tests, 25 subtests |
-| `test_support_agent_comprehensive.py` | Graph compilation, RAG success/failure, ticket-classification unit tests (all categories, confidence boundary, malformed input), invalid/empty/unicode/very-long input, unknown-intent, end-to-end state shape, state isolation | 35 tests |
+| `test_support_agent_comprehensive.py` | Graph compilation, RAG success/failure, ticket-classification unit tests (all categories, confidence boundary, malformed input, LLM-client construction failure), invalid/empty/unicode/very-long input, unknown-intent, end-to-end state shape, state isolation | 36 tests |
 | `test_support_agent_api.py` | `/support/message` HTTP contract, validation, error handling (mirrors `test_hr_agent_api.py`) | 10 tests |
 | `test_support_agent_resilience.py` | LLM-failure fallback for every LLM-calling node (`_invoke_llm` regression coverage, mirrors `test_hr_agent_nodes.py`'s `RaisingLLM` tests); extraction nodes' "don't overwrite an existing field" contract | 12 tests |
 
 Plus two suites shared with the HR Agent (see `HR_AGENT.md` section 9):
 `test_cross_agent_routing.py` (deterministic HR↔Support routing isolation)
 and `test_live_llm_accuracy.py` (live-Groq accuracy regression, opt-in via
-`GROQ_API_KEY`); and `test_retrieval.py` (8 tests) for the shared
+`GROQ_API_KEY`); and `test_retrieval.py` (11 tests) for the shared
 `core/retrieval.py` dialect-routing fix that the RAG Integration section
 above describes — not Support-Agent-specific code, but what
 `retrieve_refund_policy_node` depends on.
@@ -456,4 +521,47 @@ this round of testing fixed (see [Known Limitations](#13-known-limitations)):
   (`"Unknown"`/`"Unspecified"`) rather than real extraction, and
   `lookup_order_status` returns a fixed placeholder string; both are
   pre-existing, documented gaps (see [Future Improvements](#12-future-improvements)),
-  not new defects from this round of fixes.
+  not new defects from this round of fixes. Confirmed via manual end-to-end
+  testing: `extract_account_details_node`, `extract_order_details_node`, and
+  `extract_refund_details_node` never parse these fields out of `user_input`
+  at all -- they only preserve a value already present on the state. This is
+  intentional (see each node's docstring) and already covered by
+  `test_support_agent_resilience.py`'s "preserves pre-supplied field" tests,
+  not a regression.
+
+## 14. Project Structure
+
+```
+backend/
+  app/
+    main.py                       FastAPI app, router registration
+    api/
+      support.py                  POST /support/message
+    schemas/
+      support.py                  SupportAgentRequest / SupportAgentResponse
+    agents/
+      support_agent/
+        graph.py                  build_support_graph()
+        nodes.py                  Node implementations
+        state.py                  SupportAgentState
+        rag.py                    Order-status lookup (transactional, not RAG)
+        prompts.py                LLM prompt templates
+      hr_agent/                   Sibling agent, same scaffold
+    core/
+      state.py                    AgentState (shared base)
+      graph.py                    Minimal shared scaffold graph
+      llm_client.py                get_llm() -- Groq client factory
+      embeddings.py                 BAAI/bge-m3 embedding model (sentence-transformers)
+      retrieval.py                   Dialect-aware document retrieval (pgvector / SQLite fallback)
+      rag_node.py                    rag_retrieval_node -- shared LangGraph RAG step
+      config.py                    Env/config loading
+    db/
+      database.py                  SQLModel engine/session
+test_support_agent*.py            Support Agent test suite (repo root, 6 files)
+test_retrieval.py                 Shared retrieval-layer dialect-routing coverage
+test_cross_agent_routing.py       Cross-agent routing isolation (HR + Support)
+test_live_llm_accuracy.py         Live-Groq classification accuracy regression (HR + Support)
+ingest_docs.py                    Sample document seeding script (HR policy docs today;
+                                   no Support/refund-specific documents ingested yet)
+SUPPORT_AGENT.md                  This document
+```

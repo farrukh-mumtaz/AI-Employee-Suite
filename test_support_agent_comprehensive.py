@@ -266,6 +266,20 @@ class TicketClassificationNodeTests(unittest.TestCase):
         self.assertEqual(result["ticket_category"], "Unknown")
         self.assertEqual(result["ticket_category_confidence"], 0.0)
 
+    def test_get_llm_construction_failure_defaults_to_unknown_without_raising(self):
+        # Regression test: get_llm() itself can raise (e.g. missing/invalid
+        # GROQ_API_KEY raises groq.GroqError at ChatGroq construction time,
+        # before .invoke() is ever reached) -- distinct from .invoke() or
+        # json.loads() raising, which the other tests in this class already
+        # cover. Every other LLM-calling node degrades gracefully via
+        # _invoke_llm(), which wraps get_llm() in its try/except; this node
+        # must do the same instead of letting the graph invocation crash.
+        with patch.object(
+            support_nodes, "get_llm", side_effect=RuntimeError("api_key client option must be set")
+        ):
+            result = support_nodes.ticket_classification_node({"user_input": "some ticket text"})
+        self.assertEqual(result, {"ticket_category": "Unknown", "ticket_category_confidence": 0.0})
+
     def test_empty_user_input_returns_unknown_without_calling_llm(self):
         def _fail_if_called():
             raise AssertionError("get_llm should not be called for empty user_input")

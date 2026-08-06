@@ -28,6 +28,27 @@ class ExtractNameTests(unittest.TestCase):
     def test_no_match_returns_none(self):
         self.assertIsNone(extraction.extract_name("We have a new hire starting next week."))
 
+    def test_hyphenated_and_apostrophe_names_are_captured_in_full(self):
+        self.assertEqual(
+            extraction.extract_name("Please onboard Anne-Marie O'Brien as a Developer."),
+            "Anne-Marie O'Brien",
+        )
+
+    def test_name_with_unsupported_accented_character_falls_back_to_none(self):
+        # Regression test: the name-capture class is deliberately ASCII-only
+        # (ASCII-only heuristic, not full NLU -- see the module docstring).
+        # Before the `\b` boundary was added to _NAME_PATTERNS, a name
+        # containing a character outside that class truncated mid-word
+        # instead of failing to match -- e.g. "Zoë Müller" came back as
+        # just "Zo", which then flowed into the welcome message as a
+        # confidently wrong "Hi Zo, ...". It must now fail to match entirely
+        # (falling back to "Unknown" the same way any other unmatched name
+        # does) rather than return a truncated fragment.
+        self.assertIsNone(
+            extraction.extract_name("Please onboard Zoë Müller as a Developer starting 2026-08-01.")
+        )
+        self.assertIsNone(extraction.extract_name("New hire, José García, starting Monday."))
+
 
 class ExtractRoleTests(unittest.TestCase):
     def test_as_a_pattern_stops_before_temporal_clause(self):

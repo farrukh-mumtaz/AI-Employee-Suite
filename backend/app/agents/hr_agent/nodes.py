@@ -257,9 +257,9 @@ def unknown_intent_node(state: HRAgentState) -> Dict[str, Any]:
     return {
         "agent_response": (
             "I can currently help with employee onboarding and submitting new "
-            "leave requests. I'm not yet able to answer leave policy questions, "
-            "leave balances, or check the status of an existing request -- "
-            "please reach out to HR directly for those. Could you tell me more "
-            "about what you need?"
+            "leave requests. I'm not yet able to answer leave policy or balance "
+            "questions, or check the status of an existing request -- please "
+            "reach out to HR directly for those. Could you tell me more about "
+            "what you need?"
         )
     }

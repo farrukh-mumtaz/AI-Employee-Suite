@@ -141,9 +141,9 @@ def ticket_classification_node(state: SupportAgentState) -> Dict[str, Any]:
     if not user_input:
         return {"ticket_category": "Unknown", "ticket_category_confidence": 0.0}
 
-    llm = get_llm()
     prompt = prompts.TICKET_CLASSIFICATION_PROMPT.format(user_input=user_input)
     try:
+        llm = get_llm()
         response = llm.invoke(prompt)
         result = json.loads(response.content)
         category = str(result.get("category", "")).strip()
@@ -250,7 +250,8 @@ def generate_order_status_response_node(state: SupportAgentState) -> Dict[str, A
         user_input=state.get("user_input", ""),
     )
     fallback = (
-        f"Here's the latest on order {state.get('order_id', 'Unspecified')}: "
+        f"Thanks for reaching out -- here's the latest on order "
+        f"{state.get('order_id', 'Unspecified')}: "
         f"{state.get('order_status', 'Unknown')}."
     )
     content = _invoke_llm(prompt, fallback=fallback)
