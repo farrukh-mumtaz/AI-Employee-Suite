@@ -1,5 +1,6 @@
-﻿from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlmodel import SQLModel, Session
 from backend.app.db.database import engine
 from backend.app import models
@@ -14,6 +15,8 @@ app = FastAPI(title="AI Employee Suite Backend")
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
 
 app.include_router(auth_router)
 app.include_router(hr_router)

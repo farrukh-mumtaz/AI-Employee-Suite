@@ -1,0 +1,494 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "a217d956-6d10-4f45-b515-b1e062a0d0eb",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        -32
+      ],
+      "id": "d8a04e54-24e7-4a74-af82-0a672911b4db",
+      "name": "Webhook",
+      "webhookId": "a217d956-6d10-4f45-b515-b1e062a0d0eb"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are a sales assistant for a company. \n\nCustomer name: {{ $json.body.name }}\nCustomer message: {{ $json.body.message }}\n\nYour reply must directly reference what they specifically asked about — do not give a generic response.\n\nDo the following:\n1. Classify their interest as Hot, Warm, or Cold\n2. Write a short, friendly reply addressed to them by name, that directly responds to their specific message, and asks one follow-up question\n\nRespond ONLY in this JSON format, nothing else:\n{\"intent\": \"hot/warm/cold\", \"reply\": \"your reply here\"}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        -32
+      ],
+      "id": "b35eab8e-f000-4c3f-bed9-52bf0cd66708",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "nvSf2zVcWZI0GEUP",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b86a9c27-a670-4041-a2e3-4f015c43b0de",
+              "leftValue": "={{ $json.output[0].content[0].text.toLowerCase() }}",
+              "rightValue": "hot",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -32
+      ],
+      "id": "8b7b3d91-e033-4217-beff-31561a75ac92",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8d2f0903-0943-4847-aa66-b7decc47f83c",
+              "name": "notification",
+              "value": "Alert sent to sales team - HOT lead",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        -32
+      ],
+      "id": "60ffb935-ee09-485c-8b53-21f2858c112f",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b385d62e-13dd-4c18-8297-b7e8c0ed62f4",
+              "name": "notification",
+              "value": "No urgent alert - lead logged only",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        736,
+        112
+      ],
+      "id": "b8770a59-6dd6-4392-9a2e-e2007fd40feb",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1136,
+        -32
+      ],
+      "id": "04ff763c-2aa1-4d88-be18-3155baf68092",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1152,
+        112
+      ],
+      "id": "b65db749-413a-45eb-957c-b18d4cb47dbd",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs",
+          "mode": "list",
+          "cachedResultName": "Sales Agent Leads - Test",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Webhook').item.json.body.name }}",
+            "Message": "={{ $('Webhook').item.json.body.message }}",
+            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
+            "Notified": "={{ $json.notification }}",
+            "Timestamp": "={{ $now }}",
+            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "AI reply",
+              "displayName": "AI reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notified",
+              "displayName": "Notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        -32
+      ],
+      "id": "ba987be6-a490-4a66-86aa-bf5b243e3fb5",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "brP3DccqoEYiSF3M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs",
+          "mode": "list",
+          "cachedResultName": "Sales Agent Leads - Test",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I23RWi1Y-kcDP0AFNJLOdKP4QBoSUn1CPdHeVohJLxs/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Webhook').item.json.body.name }}",
+            "Message": "={{ $('Webhook').item.json.body.message }}",
+            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
+            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}",
+            "Notified": "={{ $json.notification }}",
+            "Timestamp": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI reply",
+              "displayName": "AI reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notified",
+              "displayName": "Notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        944,
+        112
+      ],
+      "id": "fd19138c-ceae-445f-afd5-e19b19844473",
+      "name": "Append or update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "brP3DccqoEYiSF3M",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "name": "TestSync",
+            "message": "Actually, never mind, not interested anymore"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "58e2867e-9488-42ed-8cbe-09ea7ceaa961",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3df69b723821ca35cf14f4e68bb37b1b463ef4d8628f9cb0e0b3960c48af8950"
+  },
+  "nodeGroups": [],
+  "id": "vwX4eUtpoikee7tt",
+  "tags": []
+}
