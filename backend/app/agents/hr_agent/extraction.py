@@ -17,18 +17,30 @@ _TRAILING_STOP = r"(?:[.,;]|\s+(?:starting|on|from|next|beginning|effective|who|
 # regardless of sentence-start capitalization ("New hire, ..." as well as
 # "new hire, ..."), while the captured name itself stays case-sensitive --
 # requiring a capital letter is what keeps this from matching random nouns.
+#
+# Each name-word ends with `\b` rather than being left to stop wherever
+# `[a-zA-Z'-]+` runs out. Without it, a name containing a character the
+# (deliberately ASCII-only) class doesn't cover -- e.g. an accented letter
+# like "Zoe" with an umlaut, or "Jose" with an accent -- would silently
+# truncate mid-word ("Zoe"+umlaut -> "Zo") instead of failing to match. `\b`
+# forces the match to end on an actual word boundary (whitespace/punctuation/
+# end of string); Python's `\w` -- and therefore `\b` -- is Unicode-aware by
+# default, so a position between two letters (ASCII or not) is never a
+# boundary, and the match fails cleanly, falling back to "Unknown" the same
+# way an unmatched name already does, instead of returning a truncated
+# fragment.
 _NAME_PATTERNS = [
-    re.compile(r"(?i:name is)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"),
-    re.compile(r"(?i:new hire)[,:]?\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"),
-    re.compile(r"(?i:employee)[,:]?\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"),
+    re.compile(r"(?i:name is)\s+([A-Z][a-zA-Z'-]+\b(?:\s+[A-Z][a-zA-Z'-]+\b){0,2})"),
+    re.compile(r"(?i:new hire)[,:]?\s+([A-Z][a-zA-Z'-]+\b(?:\s+[A-Z][a-zA-Z'-]+\b){0,2})"),
+    re.compile(r"(?i:employee)[,:]?\s+([A-Z][a-zA-Z'-]+\b(?:\s+[A-Z][a-zA-Z'-]+\b){0,2})"),
     re.compile(
-        r"(?i:for)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2}),?\s+(?i:who|starting|joining)"
+        r"(?i:for)\s+([A-Z][a-zA-Z'-]+\b(?:\s+[A-Z][a-zA-Z'-]+\b){0,2}),?\s+(?i:who|starting|joining)"
     ),
     # Fallback: "onboard(ing) <Name>" -- e.g. "Please onboard John Doe as a
     # Backend Engineer". Appended last (lowest priority) since it's the most
     # generic marker and the other, more specific patterns above should win
     # when they match.
-    re.compile(r"(?i:onboard(?:ing)?)\s+([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){0,2})"),
+    re.compile(r"(?i:onboard(?:ing)?)\s+([A-Z][a-zA-Z'-]+\b(?:\s+[A-Z][a-zA-Z'-]+\b){0,2})"),
 ]
 
 _ROLE_PATTERNS = [

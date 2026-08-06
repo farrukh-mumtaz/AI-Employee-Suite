@@ -113,7 +113,7 @@ misleading response (e.g. telling someone who only asked a policy question
 that "your leave request needs manual review"). `CLASSIFY_INTENT_PROMPT`
 now explicitly routes them to `unknown` instead -- see [Known Limitations](#12-known-limitations).
 
-## 4. Graph Structure
+## 4. Graph Diagram
 
 `build_hr_graph()` in `backend/app/agents/hr_agent/graph.py` compiles the
 following `StateGraph`:
@@ -144,6 +144,21 @@ Two conditional-edge selector functions drive routing:
 - `_route_by_leave_decision(state)` — reads `state["leave_decision"]`, set
   by `evaluate_leave_request_node`; defaults to `"rejected"` so an
   unrecognized future decision value can never dead-end the graph.
+
+### Nodes
+
+| Node | Phase | Description |
+|---|---|---|
+| `classify_intent_node` | Entry | LLM call: single-word `workflow` classification (`onboarding` / `leave_request` / `unknown`). Drives the first conditional edge. |
+| `extract_employee_details_node` | Onboarding | Regex/keyword extraction (see `extraction.py`) of `employee_name`, `employee_role`, `start_date`; defaults to `"Unknown"` per field. Never overwrites a pre-supplied field. |
+| `generate_welcome_message_node` | Onboarding | LLM call: drafts the welcome message from the extracted details, with a deterministic fallback on LLM failure. |
+| `generate_onboarding_checklist_node` | Onboarding | Attaches the static `ONBOARDING_CHECKLIST_TEMPLATE` (no LLM call). |
+| `extract_leave_details_node` | Leave Request | Regex/keyword extraction of `leave_type`, `leave_start_date`, `leave_end_date`, `leave_reason`; defaults to `"Unspecified"`/`"Not specified"`. Never overwrites a pre-supplied field. |
+| `retrieve_leave_policy_node` | Leave Request | Calls `rag.py`'s keyword-matched placeholder policy retrieval; try/except for graceful degradation. |
+| `evaluate_leave_request_node` | Leave Request | Deterministic rule-based decision: auto-approves only if type and both dates were successfully extracted; otherwise routes to manual review. Drives the second conditional edge. |
+| `approve_leave_node` | Leave Request | LLM call: drafts the approval confirmation, referencing policy context; deterministic fallback on failure. |
+| `reject_leave_node` | Leave Request | LLM call: drafts the manual-review message (careful not to imply denial); deterministic fallback on failure. |
+| `unknown_intent_node` | Fallback | Fixed clarification message, no LLM call. |
 
 ## 5. API Endpoints
 
@@ -294,14 +309,14 @@ curl -X POST http://127.0.0.1:8000/hr/message \
 }
 ```
 
-## 9. Testing Instructions
+## 9. Testing Summary
 
 All HR Agent tests are deterministic and require no network access or
 `GROQ_API_KEY` — the LLM is stubbed via `unittest.mock.patch` on
 `backend.app.agents.hr_agent.nodes.get_llm`.
 
 ```bash
-# Full HR Agent suite (95 tests)
+# Full HR Agent suite (97 tests)
 python -m pytest test_hr_agent.py test_hr_agent_extraction.py test_hr_agent_nodes.py \
     test_hr_agent_graph.py test_hr_agent_comprehensive.py test_hr_agent_api.py -v
 
@@ -413,3 +428,14 @@ WEEKLY_TESTING_SUMMARY.md         Weekly bug-fix / accuracy / testing summary
   — unusual phrasing (no article before a job title, an unrecognized leave
   type keyword) still falls back to `"Unknown"`/`"Unspecified"`. Documented,
   not a defect; see `HR_AGENT_TEST_REPORT.md`.
+- **`extract_name`'s character class is ASCII-only by design** (no full
+  Unicode NLU), so a name containing a character outside `[a-zA-Z'-]` (e.g.
+  an accented letter) is not extracted and falls back to `"Unknown"` --
+  same documented limitation as the role/leave-type heuristics above. Fixed
+  as part of manual end-to-end testing: `_NAME_PATTERNS` previously had no
+  word-boundary check, so it *silently truncated* such names mid-word
+  instead of failing to match (e.g. "Zoë Müller" came back as "Zo", which
+  then flowed into the welcome message as "Hi Zo, ..."). Each name-word in
+  `_NAME_PATTERNS` now requires a trailing `\b`, so the match fails cleanly
+  (falling back to `"Unknown"`) instead of returning a truncated fragment.
+  See `test_hr_agent_extraction.py::ExtractNameTests`.
