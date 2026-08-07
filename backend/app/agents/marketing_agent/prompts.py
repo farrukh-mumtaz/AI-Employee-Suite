@@ -7,10 +7,12 @@ Platform: {platform}
 Tone: {tone}
 
 Write a short, engaging piece of content suited to this platform and tone.
-Keep it concise and natural - avoid sounding like generic marketing copy.
+Keep it concise and natural - avoid generic marketing copy, corporate buzzwords
+("game-changing", "revolutionary", "unlock"), and excessive exclamation points.
 
 Respond ONLY in this JSON format, nothing else:
 {{"content": "your generated content here"}}"""
+
 
 CAMPAIGN_IDEA_PROMPT = """{system_prompt}
 
@@ -27,6 +29,7 @@ reworded versions of the same idea.
 Respond ONLY in this JSON format, nothing else:
 {{"ideas": ["idea 1 here", "idea 2 here", "idea 3 here"]}}"""
 
+
 CONTENT_CALENDAR_PROMPT = """{system_prompt}
 
 You are planning a content calendar for the following:
@@ -40,6 +43,7 @@ types and platforms across the period rather than repeating the same idea.
 
 Respond ONLY in this JSON format, nothing else:
 {{"calendar": [{{"day": "Day 1", "platform": "instagram", "idea": "short idea here"}}, ...]}}"""
+
 
 AB_SUGGESTION_PROMPT = """{system_prompt}
 
