@@ -12,8 +12,10 @@ Do the following:
    (wants to sign up, ready to move forward, asking for next steps) should
    still be classified Hot — objections do not automatically lower intent
    when paired with genuine commitment.
-2. Write a short, friendly reply addressed to them by name, that directly
-   responds to their specific message, and asks one follow-up question
+2. 2. Write a short, friendly reply addressed to them by name, that directly
+   responds to their specific message, and asks one follow-up question.
+   Keep it under 3 sentences, avoid corporate jargon ("synergy", "leverage",
+   "reach out"), and sound like a real person, not a template.
 
 Respond ONLY in this JSON format, nothing else:
 {{"intent": "hot/warm/cold", "reply": "your reply here"}}"""
