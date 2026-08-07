@@ -1,0 +1,121 @@
+{
+  "name": "Marketing Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "42ee1812-b163-40bc-9419-590d46c1dc59",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e73988fe-9c28-4d05-a823-31ef3386c3c9",
+      "name": "Webhook",
+      "webhookId": "42ee1812-b163-40bc-9419-590d46c1dc59"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [{\"role\": \"user\", \"content\": \"Write a short, engaging marketing post about: {{ $json.body.topic }}. Platform: {{ $json.body.platform }}. Tone: {{ $json.body.tone }}.\"}],\n  \"temperature\": 0.3\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "2a47dcba-6107-4f13-9dbd-c247af6ed382",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "asfJdzwcB64qOoh7",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { content: $json.choices[0].message.content } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "3bea0248-a85a-4125-b87e-2cf97ecbaf10",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {
+    "Respond to Webhook": [
+      {
+        "json": {
+          "body": {
+            "topic": "new product launch",
+            "platform": "instagram",
+            "tone": "friendly"
+          }
+        }
+      }
+    ],
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "topic": "new product launch",
+            "platform": "instagram",
+            "tone": "friendly"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "46d56591-36fd-4852-a14d-0c0a68ea2bbb",
+  "meta": {
+    "instanceId": "b4d19720935fe373c753c5cdf41fd22ec39287e1c5d8a6802d3380b4f1ca42d2"
+  },
+  "nodeGroups": [],
+  "id": "1bmh10RzbyGCjDEb",
+  "tags": []
+}
