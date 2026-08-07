@@ -7,7 +7,11 @@ Your reply must directly reference what they specifically asked about —
 do not give a generic response.
 
 Do the following:
-1. Classify their interest as Hot, Warm, or Cold
+1. Classify their interest as Hot, Warm, or Cold. A lead who raises an
+   objection (price, timing, competitor) BUT also shows clear buying intent
+   (wants to sign up, ready to move forward, asking for next steps) should
+   still be classified Hot — objections do not automatically lower intent
+   when paired with genuine commitment.
 2. Write a short, friendly reply addressed to them by name, that directly
    responds to their specific message, and asks one follow-up question
 
