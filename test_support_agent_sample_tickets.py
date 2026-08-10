@@ -35,8 +35,11 @@ from backend.app.agents.support_agent.graph import build_support_graph
 _TICKET_ID_PATTERN = re.compile(r"^TCK-[0-9A-F]{8}$")
 
 _UNKNOWN_INTENT_RESPONSE = (
-    "I can currently help with password resets, order status, and "
-    "refund requests. Could you clarify which of these you need help with?"
+    "I can currently help with password resets, order status checks, "
+    "and submitting new refund requests. I'm not yet able to answer "
+    "general policy questions or check the status of an existing "
+    "request -- please reach out to support directly for those. "
+    "Could you tell me more about what you need?"
 )
 _PASSWORD_RESET_RESPONSE = "A password reset link has been sent to your account email."
 _ORDER_STATUS_RESPONSE = "Your order is currently being processed."
