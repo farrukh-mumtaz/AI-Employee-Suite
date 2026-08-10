@@ -91,7 +91,7 @@ class LeaveRequestCreate(BaseModel):
     reason: str
 
 class LeaveStatusUpdate(BaseModel):
-    status: str  # "approved" or "rejected"
+    status: str  # "approved", "rejected", or "pending"
 
 # --- Employee endpoints ---
 
@@ -104,10 +104,10 @@ def create_employee(data: EmployeeCreate, session: Session = Depends(get_session
     session.refresh(employee)
     return employee
 
-# Returns a list of all employees.
+# Returns a paginated list of employees, for cleaner dashboard/table display.
 @router.get("/employees")
-def list_employees(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    employees = session.exec(select(Employee)).all()
+def list_employees(skip: int = 0, limit: int = 20, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    employees = session.exec(select(Employee).offset(skip).limit(limit)).all()
     return employees
 
 # Returns a single employee by their ID.
@@ -136,11 +136,16 @@ def update_employee(employee_id: int, data: EmployeeCreate, session: Session = D
 # --- Leave request endpoints ---
 
 # Submits a new leave request for an employee. Starts as "pending".
+# Validates that the employee exists and that the date range makes sense.
 @router.post("/leaves")
 def create_leave_request(data: LeaveRequestCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     employee = session.get(Employee, data.employee_id)
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Bug fix: previously allowed end_date before start_date, which made no sense
+    if data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="end_date cannot be before start_date")
 
     leave = LeaveRequest(
         employee_id=data.employee_id,
@@ -160,8 +165,12 @@ def list_leave_requests(session: Session = Depends(get_session), current_user: U
     return leaves
 
 # Updates a leave request's status (approve/reject). Only admins can do this.
+# Bug fix: previously accepted any string as status; now validates it's one of the allowed values.
 @router.patch("/leaves/{leave_id}")
 def update_leave_status(leave_id: int, data: LeaveStatusUpdate, session: Session = Depends(get_session), current_user: User = Depends(require_role(["admin"]))):
+    if data.status not in ["approved", "rejected", "pending"]:
+        raise HTTPException(status_code=400, detail="status must be 'approved', 'rejected', or 'pending'")
+
     leave = session.get(LeaveRequest, leave_id)
     if not leave:
         raise HTTPException(status_code=404, detail="Leave request not found")

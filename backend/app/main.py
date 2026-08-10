@@ -24,6 +24,8 @@ app.include_router(auth_router)
 app.include_router(hr_router)
 app.include_router(orchestration_router)
 app.include_router(dashboard_router)
+app.include_router(support_router)
+app.include_router(orchestrator_router)
 
 # This catches any unhandled error anywhere in the backend, logs it to the database
 # for monitoring, and still returns a proper error response to the user.
@@ -34,8 +36,6 @@ async def global_error_handler(request: Request, exc: Exception):
         session.add(log_entry)
         session.commit()
     return JSONResponse(status_code=500, content={"detail": "Internal server error, this has been logged."})
-app.include_router(support_router)
-app.include_router(orchestrator_router)
 
 @app.get("/")
 def read_root():
