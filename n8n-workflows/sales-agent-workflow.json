@@ -1,5 +1,5 @@
 {
-  "name": "My workflow",
+  "name": "sales agent",
   "nodes": [
     {
       "parameters": {
@@ -10,45 +10,12 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -48,
-        -32
+        0,
+        0
       ],
-      "id": "d8a04e54-24e7-4a74-af82-0a672911b4db",
+      "id": "2df337a6-356f-4447-be45-a064bd984b78",
       "name": "Webhook",
       "webhookId": "a217d956-6d10-4f45-b515-b1e062a0d0eb"
-    },
-    {
-      "parameters": {
-        "modelId": {
-          "__rl": true,
-          "value": "gpt-4o-mini",
-          "mode": "list",
-          "cachedResultName": "GPT-4O-MINI"
-        },
-        "responses": {
-          "values": [
-            {
-              "content": "=You are a sales assistant for a company. \n\nCustomer name: {{ $json.body.name }}\nCustomer message: {{ $json.body.message }}\n\nYour reply must directly reference what they specifically asked about — do not give a generic response.\n\nDo the following:\n1. Classify their interest as Hot, Warm, or Cold\n2. Write a short, friendly reply addressed to them by name, that directly responds to their specific message, and asks one follow-up question\n\nRespond ONLY in this JSON format, nothing else:\n{\"intent\": \"hot/warm/cold\", \"reply\": \"your reply here\"}"
-            }
-          ]
-        },
-        "builtInTools": {},
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 2.3,
-      "position": [
-        208,
-        -32
-      ],
-      "id": "b35eab8e-f000-4c3f-bed9-52bf0cd66708",
-      "name": "Message a model",
-      "credentials": {
-        "openAiApi": {
-          "id": "nvSf2zVcWZI0GEUP",
-          "name": "n8n free OpenAI API credits"
-        }
-      }
     },
     {
       "parameters": {
@@ -62,7 +29,7 @@
           "conditions": [
             {
               "id": "b86a9c27-a670-4041-a2e3-4f015c43b0de",
-              "leftValue": "={{ $json.output[0].content[0].text.toLowerCase() }}",
+              "leftValue": "={{ $json.choices[0].message.content }}",
               "rightValue": "hot",
               "operator": {
                 "type": "string",
@@ -77,10 +44,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        480,
-        -32
+        528,
+        0
       ],
-      "id": "8b7b3d91-e033-4217-beff-31561a75ac92",
+      "id": "3f3a6d59-643a-4636-896f-8208c0955d51",
       "name": "If"
     },
     {
@@ -100,10 +67,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        720,
-        -32
+        768,
+        0
       ],
-      "id": "60ffb935-ee09-485c-8b53-21f2858c112f",
+      "id": "4c10e082-7198-48d8-83b2-4ea4a2c3c54b",
       "name": "Edit Fields"
     },
     {
@@ -123,44 +90,45 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        736,
-        112
+        784,
+        144
       ],
-      "id": "b8770a59-6dd6-4392-9a2e-e2007fd40feb",
+      "id": "fa107dbf-e1b1-4fec-abea-97048781a4ff",
       "name": "Edit Fields1"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json }}",
+        "responseBody": "={{ JSON.parse($('HTTP Request').item.json.choices[0].message.content).reply }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1136,
-        -32
+        1184,
+        0
       ],
-      "id": "04ff763c-2aa1-4d88-be18-3155baf68092",
+      "id": "56c467ec-0843-4366-876e-9ed634639dcc",
       "name": "Respond to Webhook"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json }}",
+        "responseBody": "={{ { content: $json.choices[0].message.content } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1152,
-        112
+        1200,
+        144
       ],
-      "id": "b65db749-413a-45eb-957c-b18d4cb47dbd",
+      "id": "e575bc4f-9b99-4611-bbd5-27cea5308aa9",
       "name": "Respond to Webhook1"
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
@@ -181,10 +149,10 @@
           "value": {
             "Name": "={{ $('Webhook').item.json.body.name }}",
             "Message": "={{ $('Webhook').item.json.body.message }}",
-            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
             "Notified": "={{ $json.notification }}",
             "Timestamp": "={{ $now }}",
-            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}"
+            "Intent": "={{ JSON.parse($('HTTP Request').item.json.choices[0].message.content).intent }}",
+            "AI reply": "={{ JSON.parse($('HTTP Request').item.json.choices[0].message.content).reply }}"
           },
           "matchingColumns": [
             "Name"
@@ -259,20 +227,22 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        928,
-        -32
+        976,
+        0
       ],
-      "id": "ba987be6-a490-4a66-86aa-bf5b243e3fb5",
+      "id": "27c5514e-6549-4d78-b45a-2cda1ea8dd96",
       "name": "Append or update row in sheet",
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "brP3DccqoEYiSF3M",
+        "googleApi": {
+          "id": "qk5vVi2GLLFAsugF",
           "name": "Google Sheets account"
         }
-      }
+      },
+      "disabled": true
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "appendOrUpdate",
         "documentId": {
           "__rl": true,
@@ -293,8 +263,8 @@
           "value": {
             "Name": "={{ $('Webhook').item.json.body.name }}",
             "Message": "={{ $('Webhook').item.json.body.message }}",
-            "Intent": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).intent }}",
-            "AI reply": "={{ JSON.parse($('Message a model').item.json.output[0].content[0].text).reply }}",
+            "Intent": "={{ JSON.parse($('HTTP Request').item.json.choices[0].message.content).intent }}",
+            "AI reply": "={{ JSON.parse($('HTTP Request').item.json.choices[0].message.content).reply }}",
             "Notified": "={{ $json.notification }}",
             "Timestamp": "={{ $now }}"
           },
@@ -366,15 +336,42 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        944,
-        112
+        992,
+        144
       ],
-      "id": "fd19138c-ceae-445f-afd5-e19b19844473",
+      "id": "a4f9d1c1-816f-405e-9e72-430ba0b96601",
       "name": "Append or update row in sheet1",
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "brP3DccqoEYiSF3M",
+        "googleApi": {
+          "id": "qk5vVi2GLLFAsugF",
           "name": "Google Sheets account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a sales assistant for a company.\\n\\nCustomer name: {{ $('Webhook').item.json.body.name }}\\nCustomer message: {{ $('Webhook').item.json.body.message }}\\n\\nYour reply must directly reference what they specifically asked about — do not give a generic response.\\n\\nDo the following:\\n1. Classify their interest as Hot, Warm, or Cold\\n2. Write a short, friendly reply addressed to them by name, that directly responds to their specific message, and asks one follow-up question\\n\\nRespond ONLY in this JSON format, nothing else:\\n{\\\"intent\\\": \\\"hot/warm/cold\\\", \\\"reply\\\": \\\"your reply here\\\"}\"\n    }\n  ],\n  \"temperature\": 0.3\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "49f6eebc-5cb3-4afc-9559-d0d3835c9b81",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "asfJdzwcB64qOoh7",
+          "name": "Header Auth account"
         }
       }
     }
@@ -396,18 +393,7 @@
       "main": [
         [
           {
-            "node": "Message a model",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Message a model": {
-      "main": [
-        [
-          {
-            "node": "If",
+            "node": "HTTP Request",
             "type": "main",
             "index": 0
           }
@@ -475,6 +461,17 @@
           }
         ]
       ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -483,12 +480,12 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "58e2867e-9488-42ed-8cbe-09ea7ceaa961",
+  "versionId": "6a95aca9-5125-421c-beed-71d858b9b77d",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "3df69b723821ca35cf14f4e68bb37b1b463ef4d8628f9cb0e0b3960c48af8950"
+    "instanceId": "b4d19720935fe373c753c5cdf41fd22ec39287e1c5d8a6802d3380b4f1ca42d2"
   },
   "nodeGroups": [],
-  "id": "vwX4eUtpoikee7tt",
+  "id": "ipy9uveOZRfqsHbx",
   "tags": []
 }
