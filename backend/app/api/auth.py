@@ -23,6 +23,10 @@ class RefreshRequest(BaseModel):
 
 @router.post("/signup")
 def signup(data: SignupRequest, session: Session = Depends(get_session)):
+    # Bug fix: empty passwords were being accepted, now rejected
+    if not data.password or len(data.password.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Password cannot be empty")
+
     existing_user = session.exec(select(User).where(User.email == data.email)).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")

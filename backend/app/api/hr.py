@@ -98,6 +98,10 @@ class LeaveStatusUpdate(BaseModel):
 # Creates a new employee record. Only logged-in users can do this.
 @router.post("/employees")
 def create_employee(data: EmployeeCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Bug fix: empty employee names were being accepted, now rejected
+    if not data.name or len(data.name.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Employee name cannot be empty")
+
     employee = Employee(name=data.name, department=data.department, position=data.position)
     session.add(employee)
     session.commit()
