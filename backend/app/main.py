@@ -6,7 +6,6 @@ from backend.app.db.database import engine
 from backend.app import models
 from backend.app.api.auth import router as auth_router
 from backend.app.api.hr import router as hr_router
-from backend.app.api.orchestration import router as orchestration_router
 from backend.app.api.dashboard import router as dashboard_router
 from backend.app.models.error_log import ErrorLog
 from backend.app.api.orchestrator import router as orchestrator_router
@@ -22,7 +21,6 @@ def on_startup():
 
 app.include_router(auth_router)
 app.include_router(hr_router)
-app.include_router(orchestration_router)
 app.include_router(dashboard_router)
 app.include_router(support_router)
 app.include_router(orchestrator_router)
