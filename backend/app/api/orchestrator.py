@@ -8,11 +8,20 @@
 # built once at import time -- LangGraph's compiled graphs are
 # stateless/reusable across invocations. Mirrors backend/app/api/hr.py and
 # backend/app/api/support.py's "build once, invoke per request" pattern.
+#
+# Updated: added authentication (only logged-in users can route messages)
+# and interaction logging (for dashboard metrics), matching the security
+# and monitoring standards used across the rest of the backend.
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session
 
 from backend.app.core.orchestrator import build_orchestrator_graph
+from backend.app.core.dependencies import get_current_user
+from backend.app.db.database import get_session
+from backend.app.models.user import User
+from backend.app.models.agent_log import AgentLog
 from backend.app.schemas.hr import HRAgentResponse
 from backend.app.schemas.orchestrator import OrchestratorRequest, OrchestratorResponse
 from backend.app.schemas.support import SupportAgentResponse
@@ -25,11 +34,16 @@ _orchestrator_graph = build_orchestrator_graph()
 
 
 @router.post("/message", response_model=OrchestratorResponse)
-def send_agent_message(request: OrchestratorRequest) -> OrchestratorResponse:
+def send_agent_message(
+    request: OrchestratorRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> OrchestratorResponse:
     """Route a single message to the HR or Support agent and return its response.
 
     Each call is a fresh, independent run (no conversation state persisted
     between requests) -- matching /hr/message and /support/message.
+    Requires authentication, and logs every interaction for dashboard metrics.
     """
     initial_state = {
         "messages": [],
@@ -52,6 +66,11 @@ def send_agent_message(request: OrchestratorRequest) -> OrchestratorResponse:
         if not agent_response:
             logger.error("HR agent produced no response for state: %s", hr_state)
             raise HTTPException(status_code=500, detail="HR agent produced no response")
+
+        # Log this interaction so it shows up in dashboard metrics
+        session.add(AgentLog(agent_name="hr", user_input=request.user_input, agent_response=agent_response))
+        session.commit()
+
         return OrchestratorResponse(
             agent="hr",
             hr=HRAgentResponse(
@@ -74,6 +93,11 @@ def send_agent_message(request: OrchestratorRequest) -> OrchestratorResponse:
     if not agent_response:
         logger.error("Support agent produced no response for state: %s", support_state)
         raise HTTPException(status_code=500, detail="Support agent produced no response")
+
+    # Log this interaction so it shows up in dashboard metrics
+    session.add(AgentLog(agent_name="support", user_input=request.user_input, agent_response=agent_response))
+    session.commit()
+
     return OrchestratorResponse(
         agent="support",
         support=SupportAgentResponse(
