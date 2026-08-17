@@ -45,38 +45,40 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { content: $json.choices[0].message.content } }}",
+        "responseBody": "={{ $json }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        448,
+        672,
         0
       ],
       "id": "3bea0248-a85a-4125-b87e-2cf97ecbaf10",
       "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  content: $json.choices[0].message.content\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "59fbd55e-b43e-4894-946c-1d1e0cc5ffb3",
+      "name": "Code in JavaScript"
     }
   ],
   "pinData": {
-    "Respond to Webhook": [
-      {
-        "json": {
-          "body": {
-            "topic": "new product launch",
-            "platform": "instagram",
-            "tone": "friendly"
-          }
-        }
-      }
-    ],
     "Webhook": [
       {
         "json": {
           "body": {
-            "topic": "new product launch",
-            "platform": "instagram",
-            "tone": "friendly"
+            "topic": "holiday sale",
+            "platform": "linkedin",
+            "tone": "professional"
           }
         }
       }
@@ -98,6 +100,17 @@
       "main": [
         [
           {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
             "node": "Respond to Webhook",
             "type": "main",
             "index": 0
@@ -109,9 +122,10 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "versionId": "46d56591-36fd-4852-a14d-0c0a68ea2bbb",
+  "versionId": "056f7c10-1a1c-4e6f-8405-229f840c6441",
   "meta": {
     "instanceId": "b4d19720935fe373c753c5cdf41fd22ec39287e1c5d8a6802d3380b4f1ca42d2"
   },
